@@ -5,3 +5,17 @@ dist/
 legacy/
 CLAUDE.md
 PROMPTS.md
+
+# Vite
+dist-ssr/
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
