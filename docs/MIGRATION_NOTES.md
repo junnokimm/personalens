@@ -3,6 +3,13 @@
 ## 진행 상황
 
 - 2026-10-06: 코드 작업 시작 전. `legacy/` 전체(`index.html`, `core.js`, `csv.js`, `comparison.js`, `conditions.js`, `app.js`, `REVISION_NOTES.md`)와 `persona-schema.js`/`korea-map.js` 구조를 읽고 계획을 세움. 아래 "계획" 절 참고.
+- 2026-10-06 [단계 2]: Vite + React(JS) 프로젝트 뼈대를 만들고 `react-router-dom`, `zustand`, `immer`, `vitest`를 설치함. `npm run dev`/`npm run build` 모두 통과 확인(빌드 결과물에 `legacy/` 내용 없음 — React 내부의 `react.legacy_hidden` 심볼과는 무관).
+  - `scripts/convert-legacy-data.mjs`로 `legacy/persona-schema.js` → `src/data/personaSchema.json`, `legacy/korea-map.js` → `src/data/koreaMap.json` 변환. 스크립트가 원본 JS를 실제로 실행해 얻은 객체와 변환된 JSON을 `assert.deepStrictEqual`로 비교해 통과 확인(수작업 수정 없음).
+  - `legacy/style.css`를 `src/styles/global.css`로 그대로 복사(diff 없음 확인)하고 `main.jsx`에서 불러옴.
+  - `index.html`에 원본의 `lang="ko"`, viewport, title, Google Fonts(Noto Sans KR) 링크를 옮김. 원본과 다른 점: `<link rel="stylesheet" href="style.css">` 대신 CSS를 `main.jsx`에서 import(Vite 관례, 기능상 차이 없음).
+  - `App.jsx`는 이번 단계에서 "PersonaScope" 글자만 표시하는 자리표시자. 실제 레이아웃·라우팅은 다음 단계에서 작업.
+  - `.gitignore`에 Vite 템플릿의 `dist-ssr/`, `*.local`, 로그/에디터 관련 줄을 기존 줄은 그대로 두고 추가. `README.md`는 scaffold 템플릿 설명(Oxlint, React Compiler 등 미사용 내용)이라 합칠 내용이 없어 그대로 둠.
+  - `package.json`의 `name`은 `personascope`로 지정. Oxlint 등 scaffold가 기본으로 넣는 린트 도구는 요청받지 않아 설치하지 않음.
 
 ## 계획
 
