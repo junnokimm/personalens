@@ -10,6 +10,9 @@
   - `App.jsx`는 이번 단계에서 "PersonaScope" 글자만 표시하는 자리표시자. 실제 레이아웃·라우팅은 다음 단계에서 작업.
   - `.gitignore`에 Vite 템플릿의 `dist-ssr/`, `*.local`, 로그/에디터 관련 줄을 기존 줄은 그대로 두고 추가. `README.md`는 scaffold 템플릿 설명(Oxlint, React Compiler 등 미사용 내용)이라 합칠 내용이 없어 그대로 둠.
   - `package.json`의 `name`은 `personascope`로 지정. Oxlint 등 scaffold가 기본으로 넣는 린트 도구는 요청받지 않아 설치하지 않음.
+- 2026-10-07 [단계 3]: `core.js`·`csv.js`·`comparison.js`의 계산부를 `src/lib/`로 나눠 옮김(`config.js`, `random.js`, `schema.js`, `survey.js`, `cohort.js`, `simulation.js`, `analysis.js`, `comparison.js`, `csv.js`, `sample.js`). `comparison.js`는 `compareRows`/`topAttributes`/`gapText`만 옮기고, HTML을 만드는 `gapBadge`/`pairBars`/`responseComparison`은 화면 작업 단계로 남겨 둠.
+  - `root.PS`/`root.PSCSV`/전역 `PERSONA_SCHEMA` 대신 모듈별 named export를 쓰고, 함수 본문·난수를 꺼내는 순서·루프 순서는 그대로 둠. `core.js`의 `SCHEMA()` 헬퍼(전역 `PERSONA_SCHEMA` 또는 `root.PERSONA_SCHEMA` 참조)는 `src/data/personaSchema.json` import로 교체했지만, 나머지 함수 본문에서는 그대로 `SCHEMA()`로 호출하도록 `schema.js`·`cohort.js`에 동일한 지역 헬퍼를 둠(전역이 없어져 생긴 문제를 고친 것 — 전환 규칙 2번 예외).
+  - `tests/legacy-parity.test.js`를 추가함. `node:vm`으로 `legacy/persona-schema.js`→`core.js`→`csv.js`→`comparison.js`를 순서대로 `runInContext`해서 원본 `PS`/`PSCSV`/`compareRows` 등을 그대로 얻고, 프로젝트·문항·집단 ID를 고정 문자열로 만든 fixture 3종((a) 후속 질문 포함 sample 구성, (b) 지역·연령·Big5 조건이 걸린 집단, (c) 주관식+'기타' 선택지가 있는 설문)으로 `buildCohort`/`createRun`/`distribution`/`responseStats`/`breakdown`/`filterPeople`/`estimateCount`/`compareRows`/`topAttributes`/`validateSurvey`/`lockVersion`/`exportCsv`(wide·long·codebook) 결과를 원본과 비교함. `uid()`가 쓰는 `Date.now()`/`Math.random()` 때문에 `cohort.created`·`run.id`·`run.created`만 고정값으로 덮어쓰고 비교함. 모두 통과(`npm test` 28개).
 
 ## 계획
 
