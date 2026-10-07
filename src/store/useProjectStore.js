@@ -341,3 +341,8 @@ export const useProjectStore = create(
     },
   ),
 )
+
+/* 화면에서 자주 쓰는 "현재 프로젝트 찾기" 셀렉터 */
+export function useProject(projectId) {
+  return useProjectStore((state) => state.projects.find((p) => p.id === projectId))
+}
