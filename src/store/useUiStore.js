@@ -38,6 +38,7 @@ export const useUiStore = create(immer((set) => ({
   saveOk: true,
   confirm: null, // { title, body, ok, danger, onOk } | null
   toast: null, // { text, actionLabel, action } | null — action: { onClick } | { to } | null
+  filterModal: null, // 원본 FM — { mode, title, filters, start, need?, run?, base?, onApply } | null
 
   /* ---------- 결과 화면 ---------- */
   setResultsUi(partial) { set((state) => { Object.assign(state, partial) }) },
@@ -76,4 +77,8 @@ export const useUiStore = create(immer((set) => ({
     set((state) => { state.confirm = { title, body, ok, danger, onOk } })
   },
   closeConfirm() { set((state) => { state.confirm = null }) },
+
+  /* ---------- 조건 선택 팝업 ---------- */
+  openFilterModal(opts) { set((state) => { state.filterModal = opts }) },
+  closeFilterModal() { set((state) => { state.filterModal = null }) },
 })))
