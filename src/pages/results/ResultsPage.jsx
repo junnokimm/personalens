@@ -6,6 +6,7 @@ import { useUiStore } from '../../store/useUiStore.js'
 import { stamp } from '../../utils/format.js'
 import ChatView from './ChatView.jsx'
 import DetailView from './DetailView.jsx'
+import ExportView from './ExportView.jsx'
 import OverallView from './OverallView.jsx'
 import PersonasView from './PersonasView.jsx'
 import SegmentView from './SegmentView.jsx'
@@ -80,7 +81,7 @@ export default function ResultsPage() {
       </div>
       {view === 'segment' ? <SegmentView run={run} />
         : view === 'personas' ? <PersonasView project={project} run={run} />
-        : view === 'export' ? <p className="muted">내보내기 화면은 다음 커밋에서 만듭니다.</p>
+        : view === 'export' ? <ExportView project={project} run={run} />
         : view === 'detail' ? <DetailView project={project} run={run} />
         : view === 'chat' ? <ChatView project={project} run={run} />
         : <OverallView run={run} />}
