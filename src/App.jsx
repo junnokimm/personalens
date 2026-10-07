@@ -41,23 +41,18 @@ function ProjectGate() {
   return <Outlet />
 }
 
-/* 다음 단계에서 채울 화면들의 자리표시자 */
-function Placeholder({ label }) {
-  return <p className="muted">{label} 화면은 다음 단계에서 만듭니다.</p>
-}
-
 function App() {
   return (
     <Routes>
       <Route element={<RootShell />}>
         <Route index element={<ProjectsPage />} />
         <Route path="p/:projectId" element={<ProjectGate />}>
-          <Route index element={<SummaryPage />} handle={{ page: 'summary' }} />
-          <Route path="runs" element={<RunsPage />} handle={{ page: 'runs' }} />
-          <Route path="results/:runId?" element={<ResultsPage />} handle={{ page: 'results' }} />
-          <Route path="design/survey" element={<SurveyPage />} handle={{ page: 'survey' }} />
-          <Route path="design/target" element={<TargetPage />} handle={{ page: 'target' }} />
-          <Route path="simulation" element={<SimulationPage />} handle={{ page: 'simulation' }} />
+          <Route index element={<SummaryPage />} />
+          <Route path="runs" element={<RunsPage />} />
+          <Route path="results/:runId?" element={<ResultsPage />} />
+          <Route path="design/survey" element={<SurveyPage />} />
+          <Route path="design/target" element={<TargetPage />} />
+          <Route path="simulation" element={<SimulationPage />} />
         </Route>
       </Route>
     </Routes>
