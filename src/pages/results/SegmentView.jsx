@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 
+import { KoreaMapFull } from '../../components/map/KoreaMap.jsx'
 import PairBars from '../../components/charts/PairBars.jsx'
 import SegGap from '../../components/charts/SegGap.jsx'
 import { filterPeople, distribution } from '../../lib/analysis.js'
@@ -19,6 +20,7 @@ export default function SegmentView({ run }) {
   const drill = useUiStore((s) => s.drill)
   const segKey = useUiStore((s) => s.segKey)
   const segMode = useUiStore((s) => s.segMode)
+  const mapColor = useUiStore((s) => s.mapColor)
   const setResultsUi = useUiStore((s) => s.setResultsUi)
 
   const effectiveQid = qid && run.survey.questions.some((x) => x.id === qid)
@@ -49,7 +51,7 @@ export default function SegmentView({ run }) {
     const pb = base.length ? bc / base.length * 100 : 0
     return { v, c, bc, pa, pb, gap: pa - pb }
   })
-  const effectiveSegMode = segMode === 'map' ? 'table' : segMode
+  const effectiveSegMode = segMode === 'map' && effectiveSegKey !== 'region' ? 'table' : segMode
   const baseDesc = drill.attrs.length
     ? `${drill.attrs.map((a) => attrLabel(a.key) + ' ' + a.value).join(', ')} 전체 (${qLabel(run.survey, q)} 응답과 관계없이)`
     : '전체 응답자'
@@ -148,6 +150,7 @@ export default function SegmentView({ run }) {
             <div className="seg-toggle" role="group" aria-label="보기 방식">
               <button className={effectiveSegMode === 'table' ? 'on' : ''} onClick={() => setResultsUi({ segMode: 'table' })}>표</button>
               <button className={effectiveSegMode === 'chart' ? 'on' : ''} onClick={() => setResultsUi({ segMode: 'chart' })}>차트</button>
+              {effectiveSegKey === 'region' ? <button className={effectiveSegMode === 'map' ? 'on' : ''} onClick={() => setResultsUi({ segMode: 'map' })}>지도</button> : null}
             </div>
           </div>
           {avail.length ? (
@@ -159,7 +162,9 @@ export default function SegmentView({ run }) {
                 </select>
               </div>
               <p className="muted small-text">비교 기준: {baseDesc} · {CONFIG.HIGHLIGHT_PP}%p 이상 차이는 진하게 · {CONFIG.MIN_CELL}명 미만 행은 흐리게</p>
-              {effectiveSegMode === 'table' ? table : chart}
+              {effectiveSegMode === 'map'
+                ? <KoreaMapFull rows={rows.map((x) => ({ v: x.v, c: x.c, bc: x.bc, pa: x.pa, pb: x.pb, gap: x.gap }))} mapColor={mapColor} onColorChange={(c) => setResultsUi({ mapColor: c })} onNarrow={narrow} />
+                : effectiveSegMode === 'table' ? table : chart}
             </>
           ) : <p className="muted">더 나눌 수 있는 기준이 없습니다.</p>}
         </section>
