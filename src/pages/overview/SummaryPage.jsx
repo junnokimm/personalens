@@ -31,11 +31,11 @@ export default function SummaryPage() {
     .slice(0, 4)
 
   function openResult(runId) {
-    resetResultsUi()
+    resetResultsUi(project.runs.find((r) => r.id === runId))
     navigate(`/p/${project.id}/results/${runId}`)
   }
   function openChat(runId, personaId) {
-    resetResultsUi()
+    resetResultsUi(project.runs.find((r) => r.id === runId))
     setResultsUi({ personaId })
     navigate(`/p/${project.id}/results/${runId}?view=chat`)
   }

@@ -11,7 +11,7 @@ export default function RunRow({ projectId, run }) {
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
 
   function openResult() {
-    resetResultsUi()
+    resetResultsUi(run)
     navigate(`/p/${projectId}/results/${run.id}`)
   }
 

@@ -44,9 +44,9 @@ export default function SimulationPage() {
     last.groupId !== g.id ? `대상 집단: ${last.groupName} → ${g.name}` : JSON.stringify(last.groupConfig) !== JSON.stringify({ count: g.count, filters: g.filters }) ? '대상 집단: 조건 또는 인원 변경' : '대상 집단: 같음',
   ] : []
 
-  function openResult(runId) {
-    resetResultsUi()
-    navigate(`/p/${project.id}/results/${runId}`)
+  function openResult(run) {
+    resetResultsUi(run)
+    navigate(`/p/${project.id}/results/${run.id}`)
   }
 
   function handleConfirmRun() {
@@ -110,7 +110,7 @@ export default function SimulationPage() {
             tone="info"
             actions={(
               <>
-                <button className="small primary" onClick={() => openResult(same.id)}>실행 #{same.number} 결과 보기</button>
+                <button className="small primary" onClick={() => openResult(same)}>실행 #{same.number} 결과 보기</button>
                 <button className="small" onClick={handleConfirmRun}>그래도 새로 실행</button>
               </>
             )}

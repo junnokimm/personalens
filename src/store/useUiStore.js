@@ -42,9 +42,10 @@ export const useUiStore = create(immer((set) => ({
 
   /* ---------- 결과 화면 ---------- */
   setResultsUi(partial) { set((state) => { Object.assign(state, partial) }) },
-  resetResultsUi() {
+  /* 원본 openRun(id): run을 넘기면 qid를 그 실행의 첫 비주관식 문항으로 맞춘다(원본과 같은 시점의 초기화) */
+  resetResultsUi(run) {
     set((state) => {
-      state.qid = initialResultsUi.qid
+      state.qid = run ? (run.survey.questions.find((q) => q.type !== 'text')?.id ?? run.survey.questions[0].id) : initialResultsUi.qid
       state.drill = { answer: null, attrs: [] }
       state.pf = {}
       state.pSearch = ''

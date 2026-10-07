@@ -46,7 +46,7 @@ export default function Sidebar() {
 
   function openResults() {
     const r = currentRun || project.runs.find((x) => x.status === 'completed')
-    resetResultsUi()
+    resetResultsUi(r)
     navigate(r ? `/p/${project.id}/results/${r.id}` : `/p/${project.id}/results`)
   }
 

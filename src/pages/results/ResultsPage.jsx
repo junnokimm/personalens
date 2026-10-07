@@ -4,11 +4,13 @@ import PageHead from '../../components/common/PageHead.jsx'
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { stamp } from '../../utils/format.js'
+import ChatView from './ChatView.jsx'
+import DetailView from './DetailView.jsx'
 import OverallView from './OverallView.jsx'
+import PersonasView from './PersonasView.jsx'
 import SegmentView from './SegmentView.jsx'
 
-/* 원본 results()/openRun() — 실행 정보 띠, 탭 3개, 아래는 view에 따른 화면.
- * personas/detail/chat/export는 9단계에서 채운다. */
+/* 원본 results()/openRun() — 실행 정보 띠, 탭 3개, 아래는 view에 따른 화면 */
 export default function ResultsPage() {
   const { projectId, runId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -21,7 +23,7 @@ export default function ResultsPage() {
   const view = searchParams.get('view') || 'overall'
 
   function selectRun(id) {
-    resetResultsUi()
+    resetResultsUi(project.runs.find((r) => r.id === id))
     navigate(`/p/${project.id}/results/${id}`)
   }
 
@@ -77,10 +79,10 @@ export default function ResultsPage() {
         ))}
       </div>
       {view === 'segment' ? <SegmentView run={run} />
-        : view === 'personas' ? <p className="muted">페르소나 화면은 다음 단계에서 만듭니다.</p>
-        : view === 'export' ? <p className="muted">내보내기 화면은 다음 단계에서 만듭니다.</p>
-        : view === 'detail' ? <p className="muted">페르소나 상세 화면은 다음 단계에서 만듭니다.</p>
-        : view === 'chat' ? <p className="muted">인터뷰 화면은 다음 단계에서 만듭니다.</p>
+        : view === 'personas' ? <PersonasView project={project} run={run} />
+        : view === 'export' ? <p className="muted">내보내기 화면은 다음 커밋에서 만듭니다.</p>
+        : view === 'detail' ? <DetailView project={project} run={run} />
+        : view === 'chat' ? <ChatView project={project} run={run} />
         : <OverallView run={run} />}
     </>
   )

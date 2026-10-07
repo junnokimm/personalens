@@ -15,7 +15,7 @@ export default function RunsPage() {
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
 
   function openResult(runId) {
-    resetResultsUi()
+    resetResultsUi(project.runs.find((r) => r.id === runId))
     navigate(`/p/${project.id}/results/${runId}`)
   }
 
