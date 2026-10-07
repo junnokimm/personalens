@@ -11,6 +11,7 @@ export function useFocusAfterRender() {
     const el = document.getElementById(id)
     if (!el) return
     if (action === 'scroll') el.scrollIntoView({ block: 'center' })
+    else if (action === 'select') el.select()
     else el.focus()
   })
   return (id, action = 'focus') => { pending.current = { id, action } }

@@ -9,6 +9,7 @@ import ProjectsPage from './pages/ProjectsPage.jsx'
 import SummaryPage from './pages/overview/SummaryPage.jsx'
 import RunsPage from './pages/overview/RunsPage.jsx'
 import SurveyPage from './pages/design/SurveyPage.jsx'
+import TargetPage from './pages/design/TargetPage.jsx'
 import { useProject } from './store/useProjectStore.js'
 import { useSimulationJob } from './store/useSimulationJob.js'
 import { useUiStore } from './store/useUiStore.js'
@@ -53,7 +54,7 @@ function App() {
           <Route path="runs" element={<RunsPage />} handle={{ page: 'runs' }} />
           <Route path="results/:runId?" element={<Placeholder label="결과" />} handle={{ page: 'results' }} />
           <Route path="design/survey" element={<SurveyPage />} handle={{ page: 'survey' }} />
-          <Route path="design/target" element={<Placeholder label="대상 집단" />} handle={{ page: 'target' }} />
+          <Route path="design/target" element={<TargetPage />} handle={{ page: 'target' }} />
           <Route path="simulation" element={<Placeholder label="시뮬레이션" />} handle={{ page: 'simulation' }} />
         </Route>
       </Route>
