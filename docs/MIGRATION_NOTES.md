@@ -2,6 +2,10 @@
 
 ## 진행 상황
 
+- 2026-10-10 [UX 흐름 개선]: 기존 IA와 저장·시뮬레이션 계산을 유지하면서 설문→대상 집단→시뮬레이션 연결 CTA, 읽기 전용 설문 미리보기, 후속 질문 안내, 단계별 준비 상태 문구를 추가함.
+  - 결과 화면의 공유 가능한 탐색 상태(`view`, 문항, 응답 선택지, 드릴다운 속성, 나눌 기준, 페르소나, 인터뷰 기준 문항)를 URL 쿼리로 옮김. 쿼리의 `run` 문맥이 현재 경로의 실행과 일치할 때만 선택 상태를 복원해, 실행마다 반복되는 `P-001` 같은 페르소나 ID가 다른 실행에 잘못 적용되지 않게 함. 아래 단계 4·8·9의 `useUiStore` 중심 기록보다 이 항목이 현재 구현을 우선해 설명한다.
+  - `tests/ux-flow.test.js`와 `tests/result-url-state.test.js`를 추가함. 전체 52개 테스트와 프로덕션 빌드가 통과했고, 실제 브라우저에서 설문 미리보기·유효/오류 CTA·stale 집단·실행 확인/완료·결과 드릴다운→페르소나→인터뷰·새로고침·실행 전환·뒤로 가기·한글 입력을 확인함.
+  - 375px 모바일에서 문항 액션이 가로로 넘치던 문제를 문항 헤더 줄바꿈으로 수정함. 최종 `scrollWidth`는 375/768/1280 각 뷰포트 폭과 일치했고, Vite HMR과 `http://localhost:5173/` 접속, 브라우저 콘솔 오류 없음도 확인함.
 - 2026-10-06: 코드 작업 시작 전. `legacy/` 전체(`index.html`, `core.js`, `csv.js`, `comparison.js`, `conditions.js`, `app.js`, `REVISION_NOTES.md`)와 `persona-schema.js`/`korea-map.js` 구조를 읽고 계획을 세움. 아래 "계획" 절 참고.
 - 2026-10-06 [단계 2]: Vite + React(JS) 프로젝트 뼈대를 만들고 `react-router-dom`, `zustand`, `immer`, `vitest`를 설치함. `npm run dev`/`npm run build` 모두 통과 확인(빌드 결과물에 `legacy/` 내용 없음 — React 내부의 `react.legacy_hidden` 심볼과는 무관).
   - `scripts/convert-legacy-data.mjs`로 `legacy/persona-schema.js` → `src/data/personaSchema.json`, `legacy/korea-map.js` → `src/data/koreaMap.json` 변환. 스크립트가 원본 JS를 실제로 실행해 얻은 객체와 변환된 JSON을 `assert.deepStrictEqual`로 비교해 통과 확인(수작업 수정 없음).

@@ -1,11 +1,11 @@
-import { useSearchParams } from 'react-router-dom'
-
 import FilterChips from '../../components/filters/FilterChips.jsx'
 import { answerOf, filterPeople } from '../../lib/analysis.js'
 import { CONFIG } from '../../lib/config.js'
 import { attrValue, districtName } from '../../lib/schema.js'
 import { answerText, qLabel } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { useResultUrl } from './ResultUrlContext.jsx'
+import { drillFilters } from './resultUrlState.js'
 
 const PER_PAGE = 15
 const SORT_OPTIONS = [['id', 'ID 순'], ['age', '연령대 순'], ['region', '지역 순'], ['chats', '대화 많은 순']]
@@ -28,8 +28,7 @@ function personaList({ project, run, pf, pChatted, pSearch, pSort }) {
 /* 원본 personasView()/personaResults() — respCol·pPage가 유효하지 않으면(실행을 바꿨을 때)
  * store에 쓰지 않고 표시할 때만 기본값을 계산한다(전환 규칙 2번) */
 export default function PersonasView({ project, run }) {
-  const [, setSearchParams] = useSearchParams()
-  const qid = useUiStore((s) => s.qid)
+  const { qid, drill, navigateResult } = useResultUrl()
   const pf = useUiStore((s) => s.pf)
   const pSearch = useUiStore((s) => s.pSearch)
   const pSort = useUiStore((s) => s.pSort)
@@ -39,27 +38,33 @@ export default function PersonasView({ project, run }) {
   const setResultsUi = useUiStore((s) => s.setResultsUi)
   const openFilterModal = useUiStore((s) => s.openFilterModal)
 
+  const urlFilters = drillFilters(qid, drill)
+  const effectivePf = Object.keys(urlFilters).length ? urlFilters : pf
   const fallbackQid = () => run.survey.questions.find((q) => q.type !== 'text')?.id || run.survey.questions[0].id
   const effectiveRespCol = respCol && run.survey.questions.some((q) => q.id === respCol) ? respCol : (qid && run.survey.questions.some((q) => q.id === qid) ? qid : fallbackQid())
   const rq = run.survey.questions.find((q) => q.id === effectiveRespCol)
-  const { people, matched } = personaList({ project, run, pf, pChatted, pSearch, pSort })
+  const { people, matched } = personaList({ project, run, pf: effectivePf, pChatted, pSearch, pSort })
   const pages = Math.max(1, Math.ceil(people.length / PER_PAGE))
   const effectivePPage = Math.min(pPage, pages - 1)
   const shown = people.slice(effectivePPage * PER_PAGE, effectivePPage * PER_PAGE + PER_PAGE)
 
   function openPersonaFilter() {
     openFilterModal({
-      mode: 'persona', title: '페르소나 조건', run, filters: pf, start: 'resp:' + qid,
-      onApply: (f) => setResultsUi({ pf: f, pPage: 0 }),
+      mode: 'persona', title: '페르소나 조건', run, filters: effectivePf, start: 'resp:' + qid,
+      onApply: (filters) => {
+        setResultsUi({ pf: filters, pPage: 0 })
+        navigateResult({ drill: { answer: null, attrs: [] } })
+      },
     })
   }
   function removePf(key) {
-    const next = { ...pf }; delete next[key]
+    const next = { ...effectivePf }; delete next[key]
     setResultsUi({ pf: next, pPage: 0 })
+    if (key === `resp:${qid}`) navigateResult({ drill: { answer: null, attrs: [] } })
+    else if (drill.attrs.some((item) => item.key === key)) navigateResult({ drill: { ...drill, attrs: drill.attrs.filter((item) => item.key !== key) } })
   }
   function openPersona(id) {
-    setResultsUi({ personaId: id })
-    setSearchParams({ view: 'detail' })
+    navigateResult({ view: 'detail', personaId: id })
   }
 
   return (
@@ -69,7 +74,7 @@ export default function PersonasView({ project, run }) {
           <h2>페르소나 <span className="count" id="p-count">{people.length}명 / {run.people.length}명</span></h2>
           <button className="small" onClick={openPersonaFilter}>+ 조건 추가</button>
         </div>
-        <FilterChips filters={pf} ctx={{ run, empty: '조건 없음 · 이 실행의 응답자 전체' }} onRemove={removePf} />
+        <FilterChips filters={effectivePf} ctx={{ run, empty: '조건 없음 · 이 실행의 응답자 전체' }} onRemove={removePf} />
         <div className="row toolbar">
           <div className="field grow">
             <label htmlFor="p-search">검색 (입력하면 바로 반영)</label>
@@ -91,7 +96,7 @@ export default function PersonasView({ project, run }) {
             <input type="checkbox" checked={pChatted} onChange={(ev) => setResultsUi({ pChatted: ev.target.checked, pPage: 0 })} /> 대화한 페르소나만
           </label>
         </div>
-        {matched < CONFIG.MIN_GROUP && Object.keys(pf).length ? <p className="warn-text small-text">조건에 맞는 인원이 {matched}명으로 표본 기준({CONFIG.MIN_GROUP}명)보다 적습니다.</p> : null}
+        {matched < CONFIG.MIN_GROUP && Object.keys(effectivePf).length ? <p className="warn-text small-text">조건에 맞는 인원이 {matched}명으로 표본 기준({CONFIG.MIN_GROUP}명)보다 적습니다.</p> : null}
       </section>
       <section className="card" id="p-results">
         <div className="table-wrap">

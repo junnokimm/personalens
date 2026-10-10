@@ -1,5 +1,4 @@
 import { Fragment, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 
 import { answerOf } from '../../lib/analysis.js'
 import { answerText, qLabel } from '../../lib/survey.js'
@@ -8,6 +7,8 @@ import { useUiStore } from '../../store/useUiStore.js'
 import { ProfileCard } from './DetailView.jsx'
 import PeopleTrail from './PeopleTrail.jsx'
 import PersonasView, { chatsOf } from './PersonasView.jsx'
+import { useResultUrl } from './ResultUrlContext.jsx'
+import { drillFilters } from './resultUrlState.js'
 import ResponseItems from './ResponseItems.jsx'
 
 /* 원본 suggestions() */
@@ -22,12 +23,8 @@ function suggestions(run, q) {
 
 /* 원본 chatView()/ask() — 템플릿 답변 시연, AI 연결 없음. 대화는 useProjectStore.ask가 runId::personaId 키로 저장 */
 export default function ChatView({ project, run }) {
-  const [, setSearchParams] = useSearchParams()
-  const personaId = useUiStore((s) => s.personaId)
-  const chatQid = useUiStore((s) => s.chatQid)
-  const qid = useUiStore((s) => s.qid)
+  const { qid, drill, personaId, chatQid, navigateResult } = useResultUrl()
   const pf = useUiStore((s) => s.pf)
-  const setResultsUi = useUiStore((s) => s.setResultsUi)
   const askAction = useProjectStore((s) => s.ask)
   const [text, setText] = useState('')
   const inputRef = useRef(null)
@@ -40,6 +37,8 @@ export default function ChatView({ project, run }) {
     : (qid && run.survey.questions.some((x) => x.id === qid) ? qid : run.survey.questions[0].id)
   const q = run.survey.questions.find((x) => x.id === effectiveChatQid)
   const msgs = chatsOf(project, run, person.id)
+  const urlFilters = drillFilters(qid, drill)
+  const effectivePf = Object.keys(urlFilters).length ? urlFilters : pf
 
   function sendAsk(value) {
     const trimmed = String(value || '').trim()
@@ -53,9 +52,9 @@ export default function ChatView({ project, run }) {
     <>
       <PeopleTrail
         run={run}
-        pf={pf}
+        pf={effectivePf}
         steps={[
-          { label: person.id, onClick: () => setSearchParams({ view: 'detail' }) },
+          { label: person.id, onClick: () => navigateResult({ view: 'detail' }) },
           { label: '인터뷰' },
         ]}
       />
@@ -64,7 +63,7 @@ export default function ChatView({ project, run }) {
         <section className="card chat">
           <div className="field">
             <label htmlFor="chat-q">기준 문항 · 이 문항의 응답을 바탕으로 대화합니다</label>
-            <select id="chat-q" value={effectiveChatQid} onChange={(ev) => setResultsUi({ chatQid: ev.target.value })}>
+            <select id="chat-q" value={effectiveChatQid} onChange={(ev) => navigateResult({ chatQid: ev.target.value })}>
               {run.survey.questions.map((x) => {
                 const a = answerOf(run, person.id, x.id)
                 return (

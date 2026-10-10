@@ -1,9 +1,9 @@
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
 import FilterChips from '../../components/filters/FilterChips.jsx'
-import { groupError, groupStale } from '../../lib/cohort.js'
+import { groupError, groupFlowState, groupStale } from '../../lib/cohort.js'
 import { CONFIG } from '../../lib/config.js'
 import { attrLabel, estimateCount } from '../../lib/schema.js'
 import { useProject, useProjectStore } from '../../store/useProjectStore.js'
@@ -15,6 +15,7 @@ import { useFocusAfterRender } from './useFocusAfterRender.js'
 export default function TargetPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
+  const navigate = useNavigate()
   const selectGroup = useProjectStore((s) => s.selectGroup)
   const renameGroup = useProjectStore((s) => s.renameGroup)
   const dupGroup = useProjectStore((s) => s.dupGroup)
@@ -34,6 +35,7 @@ export default function TargetPage() {
   const est = estimateCount(g.filters)
   const stale = groupStale(g)
   const err = groupError(g)
+  const flow = groupFlowState(g)
   const usedBy = (id) => project.runs.filter((r) => r.groupId === id).length
 
   function handleAddGroup() {
@@ -66,13 +68,16 @@ export default function TargetPage() {
       <PageHead title="대상 집단" sub="설문을 받을 합성 페르소나 집단을 조건으로 정의합니다. 여러 집단을 저장해 두고 실행할 때 고를 수 있습니다." />
       <div className="target-layout">
         <div className="group-list">
-          {project.groups.map((x) => (
-            <button key={x.id} className={`group-item ${x.id === g.id ? 'on' : ''}`} onClick={() => selectGroup(project.id, x.id)}>
-              <b>{x.name}</b>
-              <span>{x.count}명 · {groupStale(x) ? <em className="warn-text">구성 필요</em> : '구성 완료'}</span>
-              <small>{Object.keys(x.filters).length ? Object.keys(x.filters).map((k) => attrLabel(k)).slice(0, 3).join(', ') : '조건 없음'} · 실행 {usedBy(x.id)}회</small>
-            </button>
-          ))}
+          {project.groups.map((x) => {
+            const itemFlow = groupFlowState(x)
+            return (
+              <button key={x.id} className={`group-item ${x.id === g.id ? 'on' : ''}`} onClick={() => selectGroup(project.id, x.id)}>
+                <b>{x.name}</b>
+                <span>{x.count}명 · {itemFlow.ready ? '구성 완료' : <em className="warn-text">{itemFlow.label}</em>}</span>
+                <small>{Object.keys(x.filters).length ? Object.keys(x.filters).map((k) => attrLabel(k)).slice(0, 3).join(', ') : '조건 없음'} · 실행 {usedBy(x.id)}회</small>
+              </button>
+            )
+          })}
           <button className="small add-group" onClick={handleAddGroup}>+ 새 대상 집단</button>
         </div>
         <div>
@@ -109,6 +114,13 @@ export default function TargetPage() {
           {g.cohort ? <GroupPreview group={g} stale={stale} /> : (
             <section className="card"><h2>미리보기</h2><p className="empty">아직 구성하지 않았습니다. 조건을 고른 뒤 “대상 집단 구성”을 누르세요.</p></section>
           )}
+          <Banner
+            tone={flow.tone}
+            actions={<button className="primary" disabled={!flow.ready} onClick={() => navigate(`/p/${project.id}/simulation`)}>이 집단으로 시뮬레이션 진행하기 →</button>}
+          >
+            <b>{g.name} · {g.count}명</b>
+            <p className="small-text">{flow.label}{flow.ready ? ' · 분포와 프로필을 검토했다면 시뮬레이션으로 진행하세요.' : ' · 현재 설정으로 집단을 구성해야 다음 단계로 진행할 수 있습니다.'}</p>
+          </Banner>
         </div>
       </div>
     </>

@@ -17,7 +17,6 @@ export default function SummaryPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
-  const setResultsUi = useUiStore((s) => s.setResultsUi)
 
   const last = project.runs[0]
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
@@ -35,9 +34,11 @@ export default function SummaryPage() {
     navigate(`/p/${project.id}/results/${runId}`)
   }
   function openChat(runId, personaId) {
-    resetResultsUi(project.runs.find((r) => r.id === runId))
-    setResultsUi({ personaId })
-    navigate(`/p/${project.id}/results/${runId}?view=chat`)
+    const run = project.runs.find((item) => item.id === runId)
+    resetResultsUi(run)
+    const qid = run.survey.questions.find((item) => item.type !== 'text')?.id || run.survey.questions[0].id
+    const params = new URLSearchParams({ view: 'chat', run: run.id, q: qid, seg: 'sex', persona: personaId, chatQ: qid })
+    navigate(`/p/${project.id}/results/${runId}?${params}`)
   }
 
   return (

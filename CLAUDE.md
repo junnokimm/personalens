@@ -85,8 +85,8 @@ src/
 | 원본 변수 | 새 위치 |
 | --- | --- |
 | `data` | `useProjectStore` (persist) |
-| `page`, `projectId`, `runId`, `view` | URL (아래 라우트 표) |
-| `qid`, `drill`, `segKey`, `segMode`, `pf`, `pSearch`, `pSort`, `pChatted`, `pPage`, `personaId`, `chatQid`, `respCol`, `distKey`, `CMP` | `useUiStore`의 결과 화면 상태. 원본 `openRun()`이 초기화하는 항목은 실행이 바뀔 때 똑같이 초기화한다. |
+| `page`, `projectId`, `runId`, `view`, `qid`, `drill`, `segKey`, `personaId`, `chatQid` | URL. 결과 탐색 상태는 `run`, `q`, `answer`, 반복 `attr`, `seg`, `persona`, `chatQ` 쿼리로 복원한다. |
+| `segMode`, `pf`, `pSearch`, `pSort`, `pChatted`, `pPage`, `respCol`, `distKey`, `CMP` | `useUiStore`의 공유할 필요가 없는 결과 화면 상태. 실행이 바뀌면 원본 `openRun()`과 같은 항목을 초기화한다. |
 | `openQs`, `lastDeleted` | `useUiStore` (삭제 취소 토스트가 화면 이동 뒤에도 동작해야 함) |
 | `job`, `failNext` | `useSimulationJob` / `useUiStore` |
 | `CONFIRM`, 토스트 | `useUiStore` + `ConfirmModal`, `Toast` |
@@ -98,7 +98,7 @@ src/
 | `/` | `projects` |
 | `/p/:projectId` | `summary` |
 | `/p/:projectId/runs` | `runs` |
-| `/p/:projectId/results/:runId?` + `?view=overall\|segment\|personas\|detail\|chat\|export` | `results` |
+| `/p/:projectId/results/:runId?` + `?view=...&run=...&q=...&answer=...&attr=...&seg=...&persona=...&chatQ=...` | `results` |
 | `/p/:projectId/design/survey` | `survey` |
 | `/p/:projectId/design/target` | `target` |
 | `/p/:projectId/simulation` | `simulation` |
@@ -106,6 +106,7 @@ src/
 - 없는 프로젝트·실행 ID로 들어오면 원본 `go()`처럼 프로젝트 목록이나 결과 빈 화면으로 보낸다.
 - 상단 바 문구는 원본 `pageTitle()`을 그대로 쓴다(`프로젝트명 / 개요 · 결과`).
 - 원본에 없던 기능이지만 URL 덕분에 뒤로 가기가 동작한다. 이것은 의도한 변화다.
+- 결과 URL의 `run`은 경로의 실행 ID와 선택 상태가 같은 실행에서 만들어졌는지 확인하는 문맥 표식이다. 다른 실행의 문항·페르소나 ID는 안전한 기본 화면으로 보정한다.
 
 ## 반드시 지킬 것
 

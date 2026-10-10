@@ -1,10 +1,10 @@
-import { useSearchParams } from 'react-router-dom'
-
 import personaSchema from '../../data/personaSchema.json'
 import { attrLabel, attrValue, BIG5, districtName, tScore } from '../../lib/schema.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import PersonasView, { chatsOf } from './PersonasView.jsx'
 import PeopleTrail from './PeopleTrail.jsx'
+import { useResultUrl } from './ResultUrlContext.jsx'
+import { drillFilters } from './resultUrlState.js'
 import ResponseItems from './ResponseItems.jsx'
 
 /* 원본 big5Bars() */
@@ -42,24 +42,23 @@ export function ProfileCard({ person, compact }) {
 
 /* 원본 detailView() */
 export default function DetailView({ project, run }) {
-  const [, setSearchParams] = useSearchParams()
-  const personaId = useUiStore((s) => s.personaId)
+  const { qid, drill, personaId, navigateResult } = useResultUrl()
   const pf = useUiStore((s) => s.pf)
-  const setResultsUi = useUiStore((s) => s.setResultsUi)
+  const urlFilters = drillFilters(qid, drill)
+  const effectivePf = Object.keys(urlFilters).length ? urlFilters : pf
 
   const person = run.people.find((p) => p.id === personaId)
   if (!person) return <PersonasView project={project} run={run} />
 
-  function openChat(qid) {
-    setResultsUi({ chatQid: qid ?? null })
-    setSearchParams({ view: 'chat' })
+  function openChat(questionId) {
+    navigateResult({ view: 'chat', chatQid: questionId ?? qid })
   }
 
   const chatCount = chatsOf(project, run, person.id).length
 
   return (
     <>
-      <PeopleTrail run={run} pf={pf} steps={[{ label: person.id }]} />
+      <PeopleTrail run={run} pf={effectivePf} steps={[{ label: person.id }]} />
       <div className="page-sub">
         <h2>{person.id}의 프로필과 응답</h2>
         <button className="primary" onClick={() => openChat(null)}>인터뷰{chatCount ? ` (대화 ${chatCount}건)` : ''}</button>

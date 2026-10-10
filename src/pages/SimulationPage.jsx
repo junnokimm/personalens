@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Banner from '../components/common/Banner.jsx'
 import PageHead from '../components/common/PageHead.jsx'
 import FilterChips from '../components/filters/FilterChips.jsx'
-import { groupStale } from '../lib/cohort.js'
+import { groupError, groupStale } from '../lib/cohort.js'
 import { validateSurvey } from '../lib/survey.js'
 import RunRow from './overview/RunRow.jsx'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
@@ -32,8 +32,9 @@ export default function SimulationPage() {
 
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
   const errs = validateSurvey(project.survey).summary
+  const groupErr = groupError(g)
   const stale = groupStale(g)
-  const ready = !errs.length && !stale
+  const ready = !errs.length && !groupErr && !stale
   const nQ = project.survey.questions.length
   const same = ready ? sameAsRun(project, g) : null
   const last = project.runs.find((r) => r.status === 'completed')
@@ -78,7 +79,7 @@ export default function SimulationPage() {
           <div className="card-top"><h2>설문</h2><button className="small" onClick={() => navigate(`/p/${project.id}/design/survey`)}>설계에서 수정</button></div>
           <p className="big">{project.survey.title || '주제 미입력'}</p>
           <p className="muted">{project.survey.draft || !project.survey.version ? `v${project.survey.version + 1}로 확정되어 실행됩니다` : `v${project.survey.version}`} · 문항 {nQ}개</p>
-          {errs.length ? <p className="err-text">확인할 내용 {errs.length}개 · {errs[0].msg}</p> : <p className="ok-text">준비됨</p>}
+          {errs.length ? <p className="err-text">확인할 내용 {errs.length}개 · {errs[0].msg}</p> : <p className="ok-text">실행 준비 완료</p>}
         </section>
         <section className="card">
           <div className="card-top"><h2>대상 집단</h2><button className="small" onClick={() => navigate(`/p/${project.id}/design/target`)}>설계에서 수정</button></div>
@@ -91,7 +92,9 @@ export default function SimulationPage() {
             </select>
           </div>
           <FilterChips filters={g.filters} />
-          {stale ? <p className="err-text">이 집단은 현재 조건으로 구성되지 않았습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단에서 구성</button></p> : <p className="ok-text">준비됨</p>}
+          {groupErr ? <p className="err-text">{groupErr} <button className="link" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단에서 수정</button></p>
+            : stale ? <p className="err-text">이 집단은 현재 조건으로 구성되지 않았습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단에서 구성</button></p>
+              : <p className="ok-text">실행 준비 완료</p>}
         </section>
       </div>
       <section className="card run-card">
@@ -100,7 +103,7 @@ export default function SimulationPage() {
             <h2>실행</h2>
             <p className="muted">{g.count}명 × 문항 {nQ}개 = 예상 응답 <b>{(g.count * nQ).toLocaleString()}개</b></p>
           </div>
-          <span className={`tag ${ready ? 'ok' : 'bad'}`}>{ready ? '실행 가능' : '설계 확인 필요'}</span>
+          <span className={`tag ${running ? 'info' : ready ? 'ok' : 'bad'}`}>{running ? '실행 중' : ready ? '실행 준비 완료' : '설계 확인 필요'}</span>
         </div>
         {diffs.length ? <p className="small-text muted">실행 #{last.number}과 비교 · {diffs.join(' · ')}</p> : null}
         {running ? (

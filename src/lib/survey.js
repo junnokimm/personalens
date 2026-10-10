@@ -52,6 +52,14 @@ export function validateSurvey(s) {
   }
   return { summary, byId }
 }
+export function surveyFlowState(s, hasRuns) {
+  if (validateSurvey(s).summary.length) {
+    const untouched = !s.title.trim() && !s.questions.length
+    return { tone: 'bad', label: untouched ? '작성 중' : '수정 필요', ready: false }
+  }
+  if (s.draft && hasRuns) return { tone: 'info', label: '이전 실행 이후 변경됨', ready: true }
+  return { tone: 'info', label: '실행 준비 완료', ready: true }
+}
 export const surveyError = (s) => validateSurvey(s).summary[0]?.msg || ''
 /* 버전: 편집 중에는 올리지 않고 실행할 때 확정 — N-01 / R-11 */
 export const versionText = (s) => (s.draft || !s.version ? 'v' + (s.version + 1) + ' 편집 중' : 'v' + s.version)
