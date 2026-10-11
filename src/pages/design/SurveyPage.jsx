@@ -56,7 +56,7 @@ export default function SurveyPage() {
     focusAfterRender(`q-${qid}`, 'scroll')
   }
 
-  const verSel = (
+  const verSel = hist.length ? (
     <label className="ver">
       <span>버전</span>
       <select aria-label="설문 버전" value="" onChange={handleRestoreVersion}>
@@ -66,6 +66,11 @@ export default function SurveyPage() {
         ))}
       </select>
     </label>
+  ) : (
+    <span className="ver">
+      <span>버전</span>
+      <b>{versionText(s)}</b>
+    </span>
   )
 
   const verNote = s.draft && s.version

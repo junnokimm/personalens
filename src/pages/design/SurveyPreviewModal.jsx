@@ -33,7 +33,7 @@ export default function SurveyPreviewModal({ survey, onClose }) {
       <div className="preview-survey-head">
         <h1>{survey.title || '제목 없음'}</h1>
         {survey.description ? <p>{survey.description}</p> : null}
-        <p className="muted small-text">응답자에게 표시되는 문항 순서입니다. 입력 내용은 저장되지 않습니다.</p>
+        <p className="muted small-text">응답자에게 표시되는 문항 순서입니다. 미리보기에서는 응답할 수 없습니다.</p>
       </div>
       <div className="preview-questions">
         {ordered(survey).map((question) => {
