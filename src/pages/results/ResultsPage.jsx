@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import PageHead from '../../components/common/PageHead.jsx'
 import { useProject } from '../../store/useProjectStore.js'
@@ -65,17 +65,31 @@ export default function ResultsPage() {
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
   const run = project.runs.find((item) => item.id === runId)
+  const done = project.runs.filter((item) => item.status === 'completed')
 
   function selectRun(id) {
     resetResultsUi(project.runs.find((item) => item.id === id))
     navigate(`/p/${project.id}/results/${id}`)
   }
 
-  if (!run) {
+  if (!runId) {
+    if (done.length) return <Navigate to={`/p/${project.id}/results/${done[0].id}`} replace />
     return (
       <>
         <PageHead title="결과" sub="" />
         <section className="card empty">완료된 실행이 없습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/simulation`)}>시뮬레이션 실행하기</button></section>
+      </>
+    )
+  }
+  if (!run) {
+    return (
+      <>
+        <PageHead title="결과" sub="" />
+        <section className="card empty">
+          이 실행을 찾을 수 없습니다.
+          {done.length ? <> <button className="link" onClick={() => selectRun(done[0].id)}>최근 결과 보기</button></> : null}
+          {' '}<button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
+        </section>
       </>
     )
   }
@@ -90,7 +104,6 @@ export default function ResultsPage() {
     )
   }
 
-  const done = project.runs.filter((item) => item.status === 'completed')
   return (
     <ResultUrlProvider run={run}>
       <CompletedResults project={project} run={run} done={done} onSelectRun={selectRun} />
