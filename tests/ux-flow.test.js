@@ -22,7 +22,7 @@ describe('설문 단계 연결 UX', () => {
     const state = surveyModule.surveyFlowState?.(survey, true)
 
     // Then: 실행 준비 완료 상태다
-    expect(state).toEqual({ tone: 'info', label: '이전 실행 이후 변경됨', ready: true })
+    expect(state).toEqual({ code: 'changed', tone: 'info', label: '이전 실행 이후 변경됨', ready: true })
   })
 
   it('설문 오류가 있으면 수정 필요 상태를 반환한다', () => {
@@ -33,7 +33,19 @@ describe('설문 단계 연결 UX', () => {
     const state = surveyModule.surveyFlowState?.(survey, true)
 
     // Then: 다음 단계로 진행할 수 없다
-    expect(state).toEqual({ tone: 'bad', label: '수정 필요', ready: false })
+    expect(state).toEqual({ code: 'error', tone: 'bad', label: '수정 필요', ready: false })
+  })
+
+  it('주제도 문항도 없는 새 설문은 오류가 아니라 작성 전 상태를 반환한다', () => {
+    // Given: 아직 아무것도 입력하지 않은 설문
+    const survey = { title: '', description: '', version: 0, draft: true, history: [], questions: [] }
+
+    // When: 설문 단계 상태를 계산한다
+    const state = surveyModule.surveyFlowState?.(survey, false)
+
+    // Then: 오류(error)가 아니라 작성 전(empty) 상태로 구분된다
+    expect(state.code).toBe('empty')
+    expect(state.ready).toBe(false)
   })
 
   it('설문 화면에 미리보기와 다음 단계 CTA 문구가 있다', () => {
@@ -75,7 +87,7 @@ describe('대상 집단 단계 연결 UX', () => {
     const state = cohortModule.groupFlowState?.(group)
 
     // Then: 구성 완료 상태다
-    expect(state).toEqual({ tone: 'info', label: '구성 완료', ready: true })
+    expect(state).toEqual({ code: 'built', tone: 'info', label: '구성 완료', ready: true })
   })
 
   it('조건이 바뀐 집단은 재구성 필요 상태다', () => {
@@ -87,7 +99,7 @@ describe('대상 집단 단계 연결 UX', () => {
     const state = cohortModule.groupFlowState?.(group)
 
     // Then: 다음 단계로 진행할 수 없다
-    expect(state).toEqual({ tone: 'warn', label: '조건 변경으로 재구성 필요', ready: false })
+    expect(state).toEqual({ code: 'stale', tone: 'warn', label: '조건 변경으로 재구성 필요', ready: false })
   })
 
   it('대상 집단 화면에 시뮬레이션 CTA 문구가 있다', () => {

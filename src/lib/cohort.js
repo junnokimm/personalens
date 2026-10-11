@@ -13,11 +13,12 @@ export function groupError(g) {
   if (!Number.isInteger(g.count) || g.count < CONFIG.MIN_PERSONAS || g.count > CONFIG.MAX_PERSONAS) return `페르소나 수는 ${CONFIG.MIN_PERSONAS}~${CONFIG.MAX_PERSONAS}명으로 입력하세요.`
   return ''
 }
+/* 상태 코드(invalid|unbuilt|stale|built) — survey.js의 surveyFlowState와 같은 방식 */
 export function groupFlowState(g) {
-  if (groupError(g)) return { tone: 'bad', label: '페르소나 수 수정 필요', ready: false }
-  if (!g.cohort) return { tone: 'warn', label: '구성 전', ready: false }
-  if (groupStale(g)) return { tone: 'warn', label: '조건 변경으로 재구성 필요', ready: false }
-  return { tone: 'info', label: '구성 완료', ready: true }
+  if (groupError(g)) return { code: 'invalid', tone: 'bad', label: '페르소나 수 수정 필요', ready: false }
+  if (!g.cohort) return { code: 'unbuilt', tone: 'warn', label: '구성 전', ready: false }
+  if (groupStale(g)) return { code: 'stale', tone: 'warn', label: '조건 변경으로 재구성 필요', ready: false }
+  return { code: 'built', tone: 'info', label: '구성 완료', ready: true }
 }
 export function weightedPicker(entries, rand) {
   const total = entries.reduce((a, e) => a + e.w, 0); const cum = []; let acc = 0

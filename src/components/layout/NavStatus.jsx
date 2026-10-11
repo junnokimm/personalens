@@ -1,25 +1,28 @@
 import { groupFlowState } from '../../lib/cohort.js'
-import { validateSurvey } from '../../lib/survey.js'
+import { surveyFlowState } from '../../lib/survey.js'
+
+/* 사이드바용 짧은 문구 — lib/survey.js·lib/cohort.js의 상태 코드와 한 쌍을 이룬다.
+ * 화면(SurveyPage 등)은 같은 코드에 더 긴 문구(flow.label)를 쓴다 */
+const SURVEY_NAV = {
+  empty: { c: 'todo', i: '', t: '작성 중' },
+  error: { c: 'bad', i: '!', t: '수정 필요' },
+  changed: { c: 'warn', i: '!', t: '변경됨' },
+  ready: { c: 'ok', i: '✓', t: '준비 완료' },
+}
+const GROUP_NAV_BAD = { c: 'bad', i: '!', t: '수정 필요' }
+const GROUP_NAV_STALE = { c: 'warn', i: '!', t: '재구성 필요' }
+const GROUP_NAV_UNBUILT = { c: 'todo', i: '', t: '구성 전' }
 
 /* 원본 navStatus(): 설계 메뉴의 "확인 필요"/"구성 필요" 등 표시 */
 export function navStatus(project) {
-  const errs = validateSurvey(project.survey).summary.length
-  const untouched = !project.survey.title.trim() && !project.survey.questions.length
-  const survey = errs && untouched
-    ? { c: 'todo', i: '', t: '작성 중' }
-    : errs
-      ? { c: 'bad', i: '!', t: '수정 필요' }
-    : project.survey.draft && project.runs.length
-      ? { c: 'warn', i: '!', t: '변경됨' }
-      : { c: 'ok', i: '✓', t: '준비 완료' }
-  const groupStates = project.groups.map(groupFlowState)
-  const groups = groupStates.some((state) => state.tone === 'bad')
-    ? { c: 'bad', i: '!', t: '수정 필요' }
-    : groupStates.some((state) => state.label === '조건 변경으로 재구성 필요')
-      ? { c: 'warn', i: '!', t: '재구성 필요' }
-      : groupStates.some((state) => state.label === '구성 전')
-        ? { c: 'todo', i: '', t: '구성 전' }
+  const survey = SURVEY_NAV[surveyFlowState(project.survey, project.runs.length > 0).code]
+
+  const groupCodes = project.groups.map((g) => groupFlowState(g).code)
+  const groups = groupCodes.includes('invalid') ? GROUP_NAV_BAD
+    : groupCodes.includes('stale') ? GROUP_NAV_STALE
+      : groupCodes.includes('unbuilt') ? GROUP_NAV_UNBUILT
         : { c: 'ok', i: '✓', t: project.groups.length + '개 구성 완료' }
+
   return { survey, groups }
 }
 
