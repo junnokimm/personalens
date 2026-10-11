@@ -34,7 +34,7 @@ export default function Sidebar() {
     return (
       <aside className="root-side" aria-label="주 메뉴">
         <button className="brand" onClick={() => navigate('/')}>
-          <span className="logo" aria-hidden="true">P</span>PersonaScope
+          <span className="logo" aria-hidden="true">P</span>PersonaLens
         </button>
       </aside>
     )
@@ -53,7 +53,7 @@ export default function Sidebar() {
   return (
     <aside className="root-side" aria-label="주 메뉴">
       <button className="brand" onClick={() => navigate('/')}>
-        <span className="logo" aria-hidden="true">P</span>PersonaScope
+        <span className="logo" aria-hidden="true">P</span>PersonaLens
       </button>
       <div>
         <button className="back" onClick={() => navigate('/')}>← 프로젝트 목록</button>
