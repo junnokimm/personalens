@@ -304,10 +304,19 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .cmp-pick { display: flex; align-items: center; gap: 8px; }
 .cmp-pick > span { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; color: #fff; font-weight: 700; font-size: 12px; }
 .cmp-pick.a > span { background: var(--a); } .cmp-pick.b > span { background: var(--b); }
-.cmp-sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.cmp-sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
 .size { display: grid; padding: 10px 12px; border-radius: var(--r); font-size: 12px; }
 .size b { font-size: 14px; }
 .size.a { background: #edf3fb; } .size.b { background: #fcf1e7; }
+/* 표본 적음 안내 — 노란 배너 대신 작은 정보 아이콘 + 팝오버 */
+.info-pop { position: relative; display: inline-block; margin-bottom: 12px; }
+.info-pop-trigger { padding: 3px 8px; font-size: 11px; color: var(--muted); background: var(--line-2); border-color: transparent; border-radius: 10px; }
+.info-pop-trigger:hover, .info-pop-trigger:focus-visible { color: var(--ink); background: #e5e9ee; }
+.info-pop-bubble {
+  position: absolute; z-index: 3; top: calc(100% + 6px); left: 0; width: 260px;
+  padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: 0 6px 18px rgba(20,29,40,.14); font-size: 12px; color: var(--ink); line-height: 1.5;
+}
 .sub-h { display: flex; gap: 8px; align-items: baseline; }
 .sub-h small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .top3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
