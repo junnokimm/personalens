@@ -4,6 +4,7 @@ import { CONFIG } from '../../lib/config.js'
 import { attrValue, districtName } from '../../lib/schema.js'
 import { answerText, qLabel } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { displayRegion } from '../../utils/format.js'
 import { useResultUrl } from './ResultUrlContext.jsx'
 import { drillFilters } from './resultUrlState.js'
 
@@ -110,7 +111,7 @@ export default function PersonasView({ project, run }) {
                   <tr key={p.id} className="click" tabIndex={0} onClick={() => openPersona(p.id)} onKeyDown={(ev) => { if (ev.key === 'Enter') openPersona(p.id) }}>
                     <td><b>{p.id}</b></td>
                     <td>{attrValue(p, 'age')} · {attrValue(p, 'sex')}</td>
-                    <td>{attrValue(p, 'region')} {districtName(p.attributes.district)}</td>
+                    <td>{displayRegion(p.attributes.region)} {districtName(p.attributes.district)}</td>
                     <td>{p.attributes.occupation}</td>
                     <td>{rq.type === 'text' ? <span className="muted">주관식</span> : answerText(rq, a?.answer)}</td>
                     <td>{n ? <span className="tag info">{n}건</span> : <span className="muted">—</span>}</td>

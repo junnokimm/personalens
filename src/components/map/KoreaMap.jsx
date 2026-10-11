@@ -3,7 +3,7 @@ import { Fragment, useRef, useState } from 'react'
 import koreaMap from '../../data/koreaMap.json'
 import { CONFIG } from '../../lib/config.js'
 import SegGap from '../charts/SegGap.jsx'
-import { pct } from '../../utils/format.js'
+import { displayRegion, pct } from '../../utils/format.js'
 
 const SHORT = { '충청북도': '충북', '충청남도': '충남', '전라남도': '전남', '경상북도': '경북', '경상남도': '경남' }
 const FULL_LABELS = ['강원', '경기', '충청북도', '충청남도', '전북', '전라남도', '경상북도', '경상남도', '제주']
@@ -17,7 +17,7 @@ export default function KoreaMap({ rows }) {
       <svg viewBox={`0 0 ${koreaMap.w} ${koreaMap.h}`} role="img" aria-label="시·도별 인원 지도">
         {Object.entries(koreaMap.regions).map(([n, g]) => (
           <path key={n} d={g.d} className={cls(by[n])}>
-            <title>{n} {by[n] ? `${by[n].count}명 · ${pct(by[n].percent)}` : '0명'}</title>
+            <title>{displayRegion(n)} {by[n] ? `${by[n].count}명 · ${pct(by[n].percent)}` : '0명'}</title>
           </path>
         ))}
       </svg>
@@ -88,7 +88,7 @@ export function KoreaMapFull({ rows, mapColor, onColorChange, onNarrow }) {
                 data-r={name}
                 tabIndex={can ? 0 : undefined}
                 role={can ? 'button' : undefined}
-                aria-label={can ? `${name} ${rx.c}명 · 눌러서 좁히기` : `${name} 0명`}
+                aria-label={can ? `${displayRegion(name)} ${rx.c}명 · 눌러서 좁히기` : `${displayRegion(name)} 0명`}
                 onClick={can ? () => onNarrow(name) : undefined}
                 onKeyDown={can ? (ev) => { if (ev.key === 'Enter') onNarrow(name) } : undefined}
                 onMouseMove={(ev) => showTipAtPointer(name, ev.clientX, ev.clientY)}
@@ -113,7 +113,7 @@ export function KoreaMapFull({ rows, mapColor, onColorChange, onNarrow }) {
         <div id="map-tip" className="map-tip" hidden={!hover} style={tipPos ? { left: tipPos.left, top: tipPos.top } : undefined}>
           {hover ? (
             <>
-              <b>{hover}</b>
+              <b>{displayRegion(hover)}</b>
               {x?.bc ? (
                 <>
                   <span>이 집단 {x.c}명 · {pct(x.pa)}</span>
@@ -141,12 +141,12 @@ export function KoreaMapFull({ rows, mapColor, onColorChange, onNarrow }) {
               onMouseEnter={() => showTipForRegion(r.v)}
               onMouseLeave={hideTip}
             >
-              <span>{r.v}</span><span>{r.c}명 · {pct(r.pa)}</span><span className="muted">기준 {pct(r.pb)}</span>
+              <span>{displayRegion(r.v)}</span><span>{r.c}명 · {pct(r.pa)}</span><span className="muted">기준 {pct(r.pb)}</span>
               {r.c < CONFIG.MIN_CELL ? <span className="tag">표본 적음</span> : <SegGap gap={r.gap} small={false} />}
             </button>
           ))}
         </div>
-        {zero.length ? <p className="muted small-text">0명: {zero.join(', ')}</p> : null}
+        {zero.length ? <p className="muted small-text">0명: {zero.map(displayRegion).join(', ')}</p> : null}
         <p className="muted small-text">지역을 누르면 그 지역으로 좁힙니다. 서울·세종 같은 작은 지역은 목록이나 지도에 마우스를 올려 확인하세요.</p>
       </div>
     </div>

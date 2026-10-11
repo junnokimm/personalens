@@ -6,6 +6,7 @@ import { distribution, filterPeople } from '../../lib/analysis.js'
 import { ANALYSIS_KEYS, attrLabel } from '../../lib/schema.js'
 import { choices } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { displayAttrValue } from '../../utils/format.js'
 
 const LIMIT = 8
 
@@ -90,7 +91,7 @@ export default function ResponseComparison({ run, q }) {
         {top3.map((t) => (
           <button key={t.key} className={`top-card ${effectiveAttr === t.key ? 'on' : ''}`} onClick={() => pickAttr(t.key)}>
             <span className="t-head"><b>{attrLabel(t.key)}</b><GapBadge gap={t.gap} /></span>
-            <span className="t-line">{t.value} 비율이 {gapText(t.gap)}</span>
+            <span className="t-line">{displayAttrValue(t.key, t.value)} 비율이 {gapText(t.gap)}</span>
             <span className="t-bars"><span className="lab">A</span><div className="pair"><i className="pa" style={{ width: `${t.pa}%` }} /></div><span className="num">{t.pa.toFixed(1)}%</span></span>
             <span className="t-bars"><span className="lab">B</span><div className="pair"><i className="pb" style={{ width: `${t.pb}%` }} /></div><span className="num">{t.pb.toFixed(1)}%</span></span>
           </button>
@@ -119,7 +120,7 @@ export default function ResponseComparison({ run, q }) {
       <div className="cmp-rows">
         {shown.map((x) => (
           <div className={`cmp-row ${x.small ? 'small' : ''}`} key={x.value}>
-            <span className="v">{x.value}</span>
+            <span className="v">{displayAttrValue(effectiveAttr, x.value)}</span>
             <span className="bars"><PairBars aPercent={x.pa} bPercent={x.pb} /></span>
             <span className="n">A {x.pa.toFixed(1)}% <small>({x.ca})</small> · B {x.pb.toFixed(1)}% <small>({x.cb})</small></span>
             <span className="g">{x.small ? <span className="tag">표본 적음</span> : <GapBadge gap={x.gap} />}</span>

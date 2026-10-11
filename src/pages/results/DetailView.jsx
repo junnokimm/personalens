@@ -1,5 +1,6 @@
 import personaSchema from '../../data/personaSchema.json'
 import { attrLabel, attrValue, BIG5, districtName, tScore } from '../../lib/schema.js'
+import { displayRegion } from '../../utils/format.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import PersonasView, { chatsOf } from './PersonasView.jsx'
 import PeopleTrail from './PeopleTrail.jsx'
@@ -33,7 +34,10 @@ export function ProfileCard({ person, compact }) {
   return (
     <dl className="kv">
       {keys.map((k) => (
-        <div key={k}><dt>{attrLabel(k)}</dt><dd>{attrValue(person, k)}{k === 'region' ? ' ' + districtName(person.attributes.district) : ''}</dd></div>
+        <div key={k}>
+          <dt>{k === 'region' ? '지역' : attrLabel(k)}</dt>
+          <dd>{k === 'region' ? displayRegion(person.attributes.region) + ' ' + districtName(person.attributes.district) : attrValue(person, k)}</dd>
+        </div>
       ))}
       <div><dt>직업</dt><dd>{person.attributes.occupation}</dd></div>
     </dl>
@@ -73,7 +77,7 @@ export default function DetailView({ project, run }) {
             <summary>전체 프로필 속성 보기</summary>
             <dl className="kv">
               {personaSchema.fields.filter((f) => f.type === 'category' && !BIG5.includes(f.key)).map((f) => (
-                <div key={f.key}><dt>{attrLabel(f.key)}</dt><dd>{f.key === 'region' ? attrValue(person, 'region') : person.attributes[f.key]}</dd></div>
+                <div key={f.key}><dt>{attrLabel(f.key)}</dt><dd>{f.key === 'region' ? displayRegion(person.attributes.region) : person.attributes[f.key]}</dd></div>
               ))}
             </dl>
           </details>

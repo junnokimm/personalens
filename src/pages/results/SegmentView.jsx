@@ -6,7 +6,7 @@ import { CONFIG } from '../../lib/config.js'
 import { ANALYSIS_KEYS, attrLabel, attrValue, sortValues } from '../../lib/schema.js'
 import { answerText, qLabel } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
-import { pct } from '../../utils/format.js'
+import { displayAttrValue, pct } from '../../utils/format.js'
 import { useResultUrl } from './ResultUrlContext.jsx'
 import { drillFilters } from './resultUrlState.js'
 import Trail from './Trail.jsx'
@@ -46,7 +46,7 @@ export default function SegmentView({ run }) {
   })
   const effectiveSegMode = segMode === 'map' && effectiveSegKey !== 'region' ? 'table' : segMode
   const baseDesc = drill.attrs.length
-    ? `${drill.attrs.map((a) => attrLabel(a.key) + ' ' + a.value).join(', ')} 전체 (${qLabel(run.survey, q)} 응답과 관계없이)`
+    ? `${drill.attrs.map((a) => attrLabel(a.key) + ' ' + displayAttrValue(a.key, a.value)).join(', ')} 전체 (${qLabel(run.survey, q)} 응답과 관계없이)`
     : '전체 응답자'
 
   function resetDrill() {
@@ -94,7 +94,7 @@ export default function SegmentView({ run }) {
             const c = Math.round(x.pa * people.length / 100)
             return (
               <tr key={x.v} className={c < CONFIG.MIN_CELL ? 'thin' : ''}>
-                <td>{x.v}</td>
+                <td>{displayAttrValue(effectiveSegKey, x.v)}</td>
                 <td><b>{c}명</b> · {pct(x.pa)}</td>
                 <td>{pct(x.pb)}</td>
                 <td><PairBars aPercent={x.pa} bPercent={x.pb} bClassName="pbase" /></td>
@@ -112,7 +112,7 @@ export default function SegmentView({ run }) {
     <div className="seg-chart">
       {rows.map((x) => (
         <div className="seg-bar" key={x.v}>
-          <span className="v">{x.v}</span>
+          <span className="v">{displayAttrValue(effectiveSegKey, x.v)}</span>
           <div className="track wide"><i className="pa" style={{ width: `${x.pa}%` }} /><em className="marker" style={{ left: `${x.pb}%` }} title={`비교 기준 ${pct(x.pb)}`} /></div>
           <span className="n">{pct(x.pa)} <small>기준 {pct(x.pb)}</small></span>
           <SegGap gap={x.gap} small={Math.round(x.pa * people.length / 100) < CONFIG.MIN_CELL} />
