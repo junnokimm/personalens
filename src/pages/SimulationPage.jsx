@@ -9,6 +9,7 @@ import RunRow from './overview/RunRow.jsx'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
 import { startRun } from '../store/useSimulationJob.js'
 import { useUiStore } from '../store/useUiStore.js'
+import { josa } from '../utils/format.js'
 
 /* 원본 sameAsRun() */
 function sameAsRun(project, g) {
@@ -105,9 +106,9 @@ export default function SimulationPage() {
           </div>
           <span className={`tag ${running ? 'info' : ready ? 'ok' : 'bad'}`}>{running ? '실행 중' : ready ? '실행 준비 완료' : '설계 확인 필요'}</span>
         </div>
-        {diffs.length ? <p className="small-text muted">실행 #{last.number}과 비교 · {diffs.join(' · ')}</p> : null}
+        {diffs.length ? <p className="small-text muted">실행 #{last.number}{josa(last.number, ['과', '와'])} 비교 · {diffs.join(' · ')}</p> : null}
         {running ? (
-          <Banner tone="info">실행 #{running.number}이 진행 중입니다 ({running.progress}%). 다른 화면으로 이동해도 계속되고, 끝나면 알림이 뜹니다. 한 번에 하나씩 실행할 수 있습니다.</Banner>
+          <Banner tone="info">실행 #{running.number}{josa(running.number, ['이', '가'])} 진행 중입니다 ({running.progress}%). 다른 화면으로 이동해도 계속되고, 끝나면 알림이 뜹니다. 한 번에 하나씩 실행할 수 있습니다.</Banner>
         ) : same ? (
           <Banner
             tone="info"
@@ -118,7 +119,7 @@ export default function SimulationPage() {
               </>
             )}
           >
-            실행 #{same.number}과 설정이 같습니다. 시연 생성기는 같은 결과를 냅니다.
+            실행 #{same.number}{josa(same.number, ['과', '와'])} 설정이 같습니다. 시연 생성기는 같은 결과를 냅니다.
           </Banner>
         ) : (
           <button className="primary" disabled={!ready} onClick={handleConfirmRun}>시뮬레이션 실행</button>

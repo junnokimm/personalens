@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import { useProjectStore } from './useProjectStore.js'
 import { useUiStore } from './useUiStore.js'
+import { josa } from '../utils/format.js'
 
 /* 원본 job: setInterval 핸들 하나만 존재. 어떤 화면으로 이동해도 계속되도록 모듈 전역에 둔다 */
 let intervalId = null
@@ -24,12 +25,12 @@ function tick(projectId, runId) {
     if (!result) { stopTick(); return }
     if (result.status === 'failed') {
       stopTick()
-      useUiStore.getState().showToast(`실행 #${result.number}이 실패했습니다.`, '실행 기록 보기', { to: `/p/${projectId}/runs` })
+      useUiStore.getState().showToast(`실행 #${result.number}${josa(result.number, ['이', '가'])} 실패했습니다.`, '실행 기록 보기', { to: `/p/${projectId}/runs` })
       return
     }
     if (result.status === 'completed') {
       stopTick()
-      useUiStore.getState().showToast(`실행 #${result.number}이 완료됐습니다.`, '결과 보기', { to: `/p/${projectId}/results/${runId}` })
+      useUiStore.getState().showToast(`실행 #${result.number}${josa(result.number, ['이', '가'])} 완료됐습니다.`, '결과 보기', { to: `/p/${projectId}/results/${runId}` })
     }
   }, 450)
 }
@@ -40,7 +41,7 @@ export function startRun(projectId) {
   const result = useProjectStore.getState().startRun(projectId, { failNext })
   if (!result.ok) { useUiStore.getState().showToast(result.error); return result }
   tick(projectId, result.runId)
-  useUiStore.getState().showToast(`실행 #${result.runNumber}을 시작했습니다.`)
+  useUiStore.getState().showToast(`실행 #${result.runNumber}${josa(result.runNumber, ['을', '를'])} 시작했습니다.`)
   return result
 }
 

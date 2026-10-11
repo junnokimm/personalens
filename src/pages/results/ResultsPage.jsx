@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import PageHead from '../../components/common/PageHead.jsx'
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
-import { stamp } from '../../utils/format.js'
+import { josa, stamp } from '../../utils/format.js'
 import ChatView from './ChatView.jsx'
 import DetailView from './DetailView.jsx'
 import ExportView from './ExportView.jsx'
@@ -98,7 +98,7 @@ export default function ResultsPage() {
       <>
         <PageHead title="결과" sub="" />
         <section className="card empty">
-          실행 #{run.number}은 {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
+          실행 #{run.number}{josa(run.number, ['은', '는'])} {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
         </section>
       </>
     )
