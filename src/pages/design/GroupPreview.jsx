@@ -22,7 +22,7 @@ export default function GroupPreview({ group, stale }) {
     <>
       <section className={`card ${stale ? 'dim' : ''}`}>
         <div className="card-top">
-          <h2>분포 미리보기 · {people.length}명</h2>
+          <h2>분포 미리보기 · {people.length}명{stale ? <span className="muted small-text"> · 이전 조건 기준</span> : null}</h2>
           <label className="inline-sel">
             기준
             <select aria-label="분포 기준" value={effectiveDistKey} onChange={(ev) => setResultsUi({ distKey: ev.target.value })}>

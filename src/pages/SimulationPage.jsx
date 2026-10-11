@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Banner from '../components/common/Banner.jsx'
 import PageHead from '../components/common/PageHead.jsx'
 import FilterChips from '../components/filters/FilterChips.jsx'
-import { groupError, groupStale } from '../lib/cohort.js'
+import { groupError, groupFlowState, groupStale } from '../lib/cohort.js'
 import { validateSurvey } from '../lib/survey.js'
 import RunRow from './overview/RunRow.jsx'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
@@ -87,9 +87,10 @@ export default function SimulationPage() {
           <div className="field">
             <label htmlFor="sim-group">실행할 대상 집단</label>
             <select id="sim-group" value={g.id} onChange={(ev) => selectGroup(project.id, ev.target.value)}>
-              {project.groups.map((x) => (
-                <option key={x.id} value={x.id}>{x.name} · {x.count}명{groupStale(x) ? ' (구성 필요)' : ''}</option>
-              ))}
+              {project.groups.map((x) => {
+                const xFlow = groupFlowState(x)
+                return <option key={x.id} value={x.id}>{x.name} · {x.count}명{xFlow.ready ? '' : ` (${xFlow.label})`}</option>
+              })}
             </select>
           </div>
           <FilterChips filters={g.filters} />

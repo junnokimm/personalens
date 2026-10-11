@@ -108,7 +108,6 @@ export default function TargetPage() {
             </div>
             {err ? <p className="err-text">{err}</p> : null}
             {est.estimate < g.count ? <p className="warn-text small-text">조건에 맞는 인원이 구성할 인원보다 적을 수 있습니다. 조건을 줄이거나 인원을 낮추세요.</p> : null}
-            {stale && g.cohort ? <Banner tone="warn">조건이 바뀌었습니다. 아래 미리보기는 이전 조건 기준입니다. 다시 구성해야 실행에 반영됩니다.</Banner> : null}
             {g.cohort?.textFiltersIgnored?.length ? <p className="muted small-text">서술 조건({g.cohort.textFiltersIgnored.join(', ')})은 시연 데이터에 서술이 없어 구성에 적용되지 않았습니다.</p> : null}
           </section>
           {g.cohort ? <GroupPreview group={g} stale={stale} /> : (
