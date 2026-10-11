@@ -169,6 +169,7 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .fm-editor { overflow: auto; padding: 12px 4px 12px 18px; }
 .fm-edit-head { display: flex; justify-content: space-between; align-items: baseline; }
 .fm-edit-head h3 { margin: 0 0 2px; font-size: 16px; }
+.fm-back { display: none; }
 .fm-actions { margin: 8px 0; }
 .fm-options { display: grid; gap: 0; }
 .fm-opt { display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-bottom: 1px solid var(--line-2); font-size: 13px; cursor: pointer; }
@@ -445,8 +446,12 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
   .answer { grid-template-columns: 1fr 52px 40px; }
   .answer .a-track { grid-column: 1 / -1; grid-row: 2; }
   .answer .a-go { display: none; }
+  /* 목록과 편집 화면을 동시에 보여주지 않고, FilterModal의 mobileEditorOpen 상태로 한 번에 하나만 보여준다 */
   .fm-body { grid-template-columns: 1fr; }
-  .fm-list { max-height: 160px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .fm-list { max-height: none; border-right: 0; border-bottom: 0; }
+  .fm-body.show-list .fm-editor { display: none; }
+  .fm-body.show-editor .fm-list { display: none; }
+  .fm-back { display: inline-flex; margin-bottom: 8px; }
   .seg-bar { grid-template-columns: 90px 1fr; }
   .seg-bar .n, .seg-bar .gap { grid-column: 2; }
   .map-view { grid-template-columns: 1fr; }
