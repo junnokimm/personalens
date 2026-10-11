@@ -123,4 +123,26 @@ describe('useProjectStore', () => {
     expect(useProjectStore.getState().projects.length).toBe(1)
     expect(useProjectStore.getState().projects[0].runs[0].status).toBe('completed')
   })
+
+  it('빈 저장소로 처음 열면 예시 데이터가 아무것도 수정하지 않아도 바로 저장된다', async () => {
+    const { useProjectStore: first } = await import('../src/store/useProjectStore.js')
+    const firstId = first.getState().projects[0].id
+
+    expect(localStorage.getItem(STORE_KEY)).not.toBeNull()
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY))
+    expect(saved.projects[0].id).toBe(firstId)
+
+    vi.resetModules()
+    const { useProjectStore: second } = await import('../src/store/useProjectStore.js')
+    expect(second.getState().projects[0].id).toBe(firstId)
+  })
+
+  it('running이던 실행을 불러오면 failed로 바뀐 상태가 바로 저장된다', async () => {
+    localStorage.setItem(STORE_KEY, readFixture('legacy-v4-storage-running.json'))
+
+    await import('../src/store/useProjectStore.js')
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY))
+    expect(saved.projects[0].runs[0].status).toBe('failed')
+    expect(saved.projects[0].runs[0].failNote).toBe('페이지를 새로 열어 실행이 멈췄습니다.')
+  })
 })
