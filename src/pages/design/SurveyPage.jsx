@@ -83,7 +83,12 @@ export default function SurveyPage() {
         {verSel}
       </PageHead>
       <div className="ver-line">{verNote}</div>
-      {v.summary.length ? (
+      {flow.code === 'empty' ? (
+        <Banner tone="todo">
+          <b>먼저 설문 주제를 정해 보세요</b>
+          <p className="small-text">주제를 입력한 뒤 아래 버튼으로 문항을 추가하세요. 척도형·단일선택·주관식 중에서 고를 수 있습니다.</p>
+        </Banner>
+      ) : v.summary.length ? (
         <Banner tone="bad">
           <b>확인할 내용 {v.summary.length}개</b>
           <ul>
@@ -99,7 +104,7 @@ export default function SurveyPage() {
         <div className="grid2">
           <div className="field">
             <label htmlFor="s-title">주제</label>
-            <input id="s-title" value={s.title} className={!s.title.trim() ? 'invalid' : ''} onChange={(ev) => editS(project.id, 'title', ev.target.value)} />
+            <input id="s-title" value={s.title} className={!s.title.trim() && flow.code !== 'empty' ? 'invalid' : ''} onChange={(ev) => editS(project.id, 'title', ev.target.value)} />
           </div>
           <div className="field">
             <label htmlFor="s-desc">목적</label>
@@ -135,8 +140,12 @@ export default function SurveyPage() {
         tone={flow.tone}
         actions={<button className="primary" disabled={!flow.ready} onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단 구성하기 →</button>}
       >
-        <b>{flow.ready ? '설문이 실행 가능한 상태입니다.' : '설문에 수정이 필요한 항목이 있습니다.'}</b>
-        <p className="small-text">{flow.label}{flow.ready ? ' · 대상 집단을 구성한 뒤 시뮬레이션에서 버전이 확정됩니다.' : ' · 위 오류를 해결하면 다음 단계로 진행할 수 있습니다.'}</p>
+        <b>{flow.code === 'empty' ? '아직 설문을 시작하지 않았습니다' : flow.ready ? '설문이 실행 가능한 상태입니다.' : '설문에 수정이 필요한 항목이 있습니다.'}</b>
+        <p className="small-text">
+          {flow.code === 'empty' ? '주제와 문항을 입력하면 다음 단계로 진행할 수 있습니다.'
+            : flow.ready ? flow.label + ' · 대상 집단을 구성한 뒤 시뮬레이션에서 버전이 확정됩니다.'
+              : flow.label + ' · 위 오류를 해결하면 다음 단계로 진행할 수 있습니다.'}
+        </p>
       </Banner>
       {previewOpen ? <SurveyPreviewModal survey={s} onClose={() => setPreviewOpen(false)} /> : null}
     </>

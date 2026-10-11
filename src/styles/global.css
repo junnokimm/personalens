@@ -114,6 +114,7 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .banner.warn { background: var(--warn-soft); border-color: #efd3a5; color: var(--warn); }
 .banner.bad { background: var(--bad-soft); border-color: #f2c2bd; color: var(--bad); }
 .banner.info { background: var(--accent-soft); border-color: #c8d9f1; color: var(--accent-ink); }
+.banner.todo { background: var(--line-2); border-color: var(--line); color: var(--ink); }
 .banner.compact { padding: 8px 10px; font-size: 12px; margin: 10px 0; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 .chip { background: #eef1f5; border-radius: 4px; padding: 2px 7px; font-size: 11px; color: #4c5866; }

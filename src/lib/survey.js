@@ -57,7 +57,7 @@ export function validateSurvey(s) {
 export function surveyFlowState(s, hasRuns) {
   const hasErrors = validateSurvey(s).summary.length > 0
   const untouched = !s.title.trim() && !s.questions.length
-  if (hasErrors && untouched) return { code: 'empty', tone: 'bad', label: '작성 중', ready: false }
+  if (hasErrors && untouched) return { code: 'empty', tone: 'todo', label: '작성 중', ready: false }
   if (hasErrors) return { code: 'error', tone: 'bad', label: '수정 필요', ready: false }
   if (s.draft && hasRuns) return { code: 'changed', tone: 'info', label: '이전 실행 이후 변경됨', ready: true }
   return { code: 'ready', tone: 'info', label: '실행 준비 완료', ready: true }
