@@ -81,7 +81,7 @@ export default function FilterModal({ opts }) {
   const groups = [...new Set(filteredFields.map((f) => f.group))]
 
   return (
-    <Modal className="fm" onClose={closeFilterModal} labelledBy="fm-title">
+    <Modal className="fm" onClose={closeFilterModal} labelledBy="fm-title" initialFocus="fm-search">
       <div className="modal-head">
         <h2 id="fm-title">{opts.title}</h2>
         <button className="small" onClick={closeFilterModal}>닫기</button>
@@ -92,7 +92,7 @@ export default function FilterModal({ opts }) {
       </div>
       <div className={`fm-body ${mobileEditorOpen ? 'show-editor' : 'show-list'}`}>
         <div className="fm-list">
-          <input id="fm-search" placeholder="조건 항목 검색" aria-label="조건 항목 검색" value={search} onChange={(ev) => setSearch(ev.target.value)} autoFocus />
+          <input id="fm-search" placeholder="조건 항목 검색" aria-label="조건 항목 검색" value={search} onChange={(ev) => setSearch(ev.target.value)} />
           <div id="fm-list-items">
             {!filteredFields.length ? <p className="muted small-text">검색 결과가 없습니다.</p> : groups.map((g) => (
               <Fragment key={g}>

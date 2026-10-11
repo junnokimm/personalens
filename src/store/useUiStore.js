@@ -74,8 +74,8 @@ export const useUiStore = create(immer((set) => ({
   hideToast() { set((state) => { state.toast = null }) },
 
   /* ---------- 확인 모달 ---------- */
-  openConfirm({ title, body, ok = '확인', danger = false, onOk }) {
-    set((state) => { state.confirm = { title, body, ok, danger, onOk } })
+  openConfirm({ title, body, ok = '확인', danger = false, onOk, initialFocus }) {
+    set((state) => { state.confirm = { title, body, ok, danger, onOk, initialFocus } })
   },
   closeConfirm() { set((state) => { state.confirm = null }) },
 

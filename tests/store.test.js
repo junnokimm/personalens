@@ -146,3 +146,17 @@ describe('useProjectStore', () => {
     expect(saved.projects[0].runs[0].failNote).toBe('페이지를 새로 열어 실행이 멈췄습니다.')
   })
 })
+
+describe('useUiStore', () => {
+  it('openConfirm은 initialFocus를 confirm 상태에 그대로 남긴다', async () => {
+    const { useUiStore } = await import('../src/store/useUiStore.js')
+    useUiStore.getState().openConfirm({ title: '새 프로젝트', ok: '만들기', initialFocus: 'np-name', onOk: () => {} })
+    expect(useUiStore.getState().confirm.initialFocus).toBe('np-name')
+  })
+
+  it('openConfirm에 initialFocus를 주지 않으면 undefined로 남는다(Modal이 기본 포커스로 처리)', async () => {
+    const { useUiStore } = await import('../src/store/useUiStore.js')
+    useUiStore.getState().openConfirm({ title: '삭제', ok: '삭제', danger: true, onOk: () => {} })
+    expect(useUiStore.getState().confirm.initialFocus).toBeUndefined()
+  })
+})

@@ -15,25 +15,29 @@ export default function ProjectsPage() {
   const closeConfirm = useUiStore((s) => s.closeConfirm)
 
   function openNewProject() {
+    function handleCreate() {
+      const nameInput = document.getElementById('np-name')
+      const name = nameInput.value.trim()
+      if (!name) { nameInput.focus(); return }
+      const description = document.getElementById('np-desc').value.trim()
+      const id = newProject(name, description)
+      closeConfirm()
+      navigate(`/p/${id}/design/survey`)
+    }
+    function handleKeyDown(ev) {
+      if (ev.key === 'Enter') handleCreate()
+    }
     openConfirm({
       title: '새 프로젝트',
       ok: '만들기',
       initialFocus: 'np-name',
       body: (
         <>
-          <div className="field"><label htmlFor="np-name">프로젝트 이름</label><input id="np-name" placeholder="예: 청년 주거 정책 인식 조사" /></div>
-          <div className="field"><label htmlFor="np-desc">설명 (선택)</label><input id="np-desc" /></div>
+          <div className="field"><label htmlFor="np-name">프로젝트 이름</label><input id="np-name" placeholder="예: 청년 주거 정책 인식 조사" onKeyDown={handleKeyDown} /></div>
+          <div className="field"><label htmlFor="np-desc">설명 (선택)</label><input id="np-desc" onKeyDown={handleKeyDown} /></div>
         </>
       ),
-      onOk: () => {
-        const nameInput = document.getElementById('np-name')
-        const name = nameInput.value.trim()
-        if (!name) { nameInput.focus(); return }
-        const description = document.getElementById('np-desc').value.trim()
-        const id = newProject(name, description)
-        closeConfirm()
-        navigate(`/p/${id}/design/survey`)
-      },
+      onOk: handleCreate,
     })
   }
 
