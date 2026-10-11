@@ -25,8 +25,6 @@ export default function SimulationPage() {
   const project = useProject(projectId)
   const navigate = useNavigate()
   const selectGroup = useProjectStore((s) => s.selectGroup)
-  const failNext = useUiStore((s) => s.failNext)
-  const setFailNext = useUiStore((s) => s.setFailNext)
   const openConfirm = useUiStore((s) => s.openConfirm)
   const closeConfirm = useUiStore((s) => s.closeConfirm)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
@@ -125,12 +123,6 @@ export default function SimulationPage() {
         ) : (
           <button className="primary" disabled={!ready} onClick={handleConfirmRun}>시뮬레이션 실행</button>
         )}
-        <details className="demo">
-          <summary>시연 옵션</summary>
-          <label className="check">
-            <input type="checkbox" checked={failNext} onChange={(ev) => setFailNext(ev.target.checked)} /> 다음 실행을 60%에서 실패시키기 (실패·다시 시도 확인용)
-          </label>
-        </details>
       </section>
       <section className="card">
         <div className="card-top"><h2>최근 실행</h2><button className="small" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 전체</button></div>
