@@ -1,5 +1,6 @@
 import PairBars from '../../components/charts/PairBars.jsx'
 import Banner from '../../components/common/Banner.jsx'
+import { KoreaMapCompare } from '../../components/map/KoreaMap.jsx'
 import { compareRows, gapText, topAttributes } from '../../lib/comparison.js'
 import { CONFIG } from '../../lib/config.js'
 import { distribution, filterPeople } from '../../lib/analysis.js'
@@ -110,6 +111,7 @@ export default function ResponseComparison({ run, q }) {
 
   const chart = (
     <div className="cmp-detail">
+      {effectiveAttr === 'region' ? <KoreaMapCompare rows={rows.map((x) => ({ v: x.value, c: x.ca, bc: x.cb, pa: x.pa, pb: x.pb, gap: x.gap, small: x.small }))} /> : null}
       <div className="cmp-detail-head">
         <label htmlFor="cmp-attr">속성 직접 고르기</label>
         <select id="cmp-attr" value={effectiveAttr} onChange={(ev) => pickAttr(ev.target.value)}>

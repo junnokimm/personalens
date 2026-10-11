@@ -373,6 +373,9 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 
 /* 지역 지도 */
 .map-view { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 6px; }
+/* 선택지별 응답자 비교의 지역 지도 — 막대 위에 놓이는 좁은 버전(지도가 세로로 길어 폭을 제한) */
+.cmp-map { max-width: 240px; margin: 0 auto 16px; }
+.cmp-map .map-wrap { position: relative; }
 .map-wrap { position: relative; }
 .map-wrap svg { width: 100%; height: auto; display: block; }
 .map-wrap path { stroke: #fff; stroke-width: .8; transition: fill .2s; }

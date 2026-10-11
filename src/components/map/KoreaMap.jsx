@@ -40,6 +40,96 @@ function mapClass(x, mapColor) {
   return 'm-s' + (x.pa < 5 ? 1 : x.pa < 10 ? 2 : x.pa < 20 ? 3 : 4)
 }
 
+/* 선택지별 응답자 비교(A/B)용 색 — 기존 m-p(파랑)/m-n(주황) 톤을 그대로 재사용한다(A=파랑, B=주황로 이미 맞춰져 있음).
+ * 집단 분석 지도(mapClass)와는 "0명" 판단 기준이 달라 별도 함수로 둔다: A·B 둘 다 0명이면 비어 있음으로 본다. */
+function compareMapClass(x) {
+  if (!x || (!x.c && !x.bc)) return 'm-empty'
+  if (x.small) return 'm-small'
+  const a = Math.abs(x.gap)
+  if (a < 1) return 'm-0'
+  return (x.gap > 0 ? 'm-p' : 'm-n') + (a < 3 ? 1 : a < CONFIG.HIGHLIGHT_PP ? 2 : 3)
+}
+
+/* 선택지별 응답자 비교(ResponseComparison.jsx)의 지역 지도 — KoreaMapFull과 같은 지도 데이터·라벨·툴팁 방식을 쓰되,
+ * 좁히기·색 기준 전환·오른쪽 목록 없이 지도만 간단히 보여준다(막대 위에 놓는 용도) */
+export function KoreaMapCompare({ rows }) {
+  const wrapRef = useRef(null)
+  const [hover, setHover] = useState(null)
+  const [tipPos, setTipPos] = useState(null)
+
+  const MAPROWS = Object.fromEntries(rows.map((r) => [r.v, r]))
+  const x = hover ? MAPROWS[hover] : null
+
+  function showTipAtPointer(name, clientX, clientY) {
+    const wrap = wrapRef.current.getBoundingClientRect()
+    setHover(name)
+    setTipPos({ left: Math.min(clientX - wrap.left + 12, wrap.width - 150), top: clientY - wrap.top + 12 })
+  }
+  function showTipForRegion(name) {
+    const wrap = wrapRef.current.getBoundingClientRect()
+    const el = wrapRef.current.querySelector(`path[data-r="${name}"]`)
+    setHover(name)
+    if (!el) { setTipPos(null); return }
+    const r = el.getBoundingClientRect()
+    setTipPos({ left: Math.min(r.left + r.width / 2 - wrap.left + 12, wrap.width - 150), top: r.top + r.height / 2 - wrap.top + 12 })
+  }
+  function hideTip() { setHover(null) }
+
+  return (
+    <div className="cmp-map">
+      <div className="map-wrap" ref={wrapRef}>
+        <svg viewBox={`0 0 ${koreaMap.w} ${koreaMap.h}`} role="img" aria-label="지역별 A·B 비교 지도">
+          {Object.entries(koreaMap.regions).map(([name, g]) => {
+            const rx = MAPROWS[name]
+            const has = rx && (rx.c || rx.bc)
+            return (
+              <path
+                key={name}
+                d={g.d}
+                className={`${compareMapClass(rx)} ${hover === name ? 'hi' : ''}`}
+                data-r={name}
+                tabIndex={has ? 0 : undefined}
+                aria-label={has ? `${displayRegion(name)} A ${rx.c}명 · B ${rx.bc}명` : `${displayRegion(name)} 0명`}
+                onMouseMove={(ev) => showTipAtPointer(name, ev.clientX, ev.clientY)}
+                onFocus={() => showTipForRegion(name)}
+                onMouseLeave={hideTip}
+                onBlur={hideTip}
+              />
+            )
+          })}
+          <g className="m-labels" aria-hidden="true">
+            {FULL_LABELS.map((n) => {
+              const g = koreaMap.regions[n]
+              return <text key={n} x={g.c[0]} y={g.c[1]}>{SHORT[n] || n}</text>
+            })}
+          </g>
+        </svg>
+        <div className="map-tip" hidden={!hover} style={tipPos ? { left: tipPos.left, top: tipPos.top } : undefined}>
+          {hover ? (
+            <>
+              <b>{displayRegion(hover)}</b>
+              {x && (x.c || x.bc) ? (
+                <>
+                  <span>A {x.c}명 · {pct(x.pa)}</span>
+                  <span>B {x.bc}명 · {pct(x.pb)}</span>
+                  {x.small ? <span>표본 적음</span> : <span>{x.gap >= 0 ? '+' : '−'}{Math.abs(x.gap).toFixed(1)}%p</span>}
+                </>
+              ) : <span>A·B 모두 0명</span>}
+            </>
+          ) : null}
+        </div>
+      </div>
+      <div className="m-legend">
+        <span>B 높음</span>
+        {['m-n3', 'm-n2', 'm-n1', 'm-0', 'm-p1', 'm-p2', 'm-p3'].map((c) => <i key={c} className={c} />)}
+        <span>A 높음</span>
+        <i className="m-small" /><span>{CONFIG.MIN_CELL}명 미만</span>
+        <i className="m-empty" /><span>A·B 모두 0명</span>
+      </div>
+    </div>
+  )
+}
+
 /* 원본 mapView()/mapTip()/mapHi() — 집단 나누기의 전체 지도. 색 기준 전환, 툴팁(마우스·키보드), 클릭해서 좁히기,
  * 오른쪽 목록에 마우스를 올리면 지도도 강조한다. */
 export function KoreaMapFull({ rows, mapColor, onColorChange, onNarrow }) {
