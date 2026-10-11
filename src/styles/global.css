@@ -129,6 +129,10 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .project-card b { font-size: 15px; }
 .project-card .meta { font-size: 12px; color: var(--muted); }
 .sum-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.step-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 14px; }
+.step { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 4px; }
+.step-n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--line-2); color: var(--muted); font-size: 11px; font-weight: 700; }
+.step-arrow { color: var(--muted); }
 .sum h2 { font-size: 13px; color: var(--muted); font-weight: 500; }
 .sum .big { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
 .run-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
