@@ -52,6 +52,16 @@ export function validateSurvey(s) {
   }
   return { summary, byId }
 }
+/* 상태 코드(empty|error|changed|ready)가 먼저고, tone·label은 코드에 딸린 한 쌍이다.
+ * 사이드바(NavStatus)와 화면은 이 code로만 분기하고, 각자의 표시 문구(짧은 것/긴 것)를 따로 둔다 */
+export function surveyFlowState(s, hasRuns) {
+  const hasErrors = validateSurvey(s).summary.length > 0
+  const untouched = !s.title.trim() && !s.questions.length
+  if (hasErrors && untouched) return { code: 'empty', tone: 'todo', label: '작성 중', ready: false }
+  if (hasErrors) return { code: 'error', tone: 'bad', label: '수정 필요', ready: false }
+  if (s.draft && hasRuns) return { code: 'changed', tone: 'info', label: '이전 실행 이후 변경됨', ready: true }
+  return { code: 'ready', tone: 'info', label: '실행 준비 완료', ready: true }
+}
 export const surveyError = (s) => validateSurvey(s).summary[0]?.msg || ''
 /* 버전: 편집 중에는 올리지 않고 실행할 때 확정 — N-01 / R-11 */
 export const versionText = (s) => (s.draft || !s.version ? 'v' + (s.version + 1) + ' 편집 중' : 'v' + s.version)

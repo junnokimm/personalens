@@ -11,10 +11,8 @@ export default function Big5Range({ fieldKey, selected, onLevelClick, onRangeCha
   const count = field(fieldKey).options.filter((o) => { const s = tScore(o.value); return s >= lo && s <= hi }).reduce((a, o) => a + o.count, 0)
 
   function handleRange(which, value) {
-    let newLo = which === 'lo' ? value : lo
-    let newHi = which === 'hi' ? value : hi
-    if (newLo > newHi) [newLo, newHi] = [newHi, newLo]
-    onRangeChange(newLo, newHi)
+    if (which === 'lo') onRangeChange(Math.min(value, hi), hi)
+    else onRangeChange(lo, Math.max(value, lo))
   }
 
   return (
@@ -29,10 +27,14 @@ export default function Big5Range({ fieldKey, selected, onLevelClick, onRangeCha
       </div>
       <div className="range-box" aria-label="점수 범위">
         <div className="range-vals"><span>최소 <b>{lo}</b>점</span><span>최대 <b>{hi}</b>점</span></div>
-        <label className="sr-only" htmlFor="fm-lo">최소 점수</label>
-        <input id="fm-lo" type="range" min={20} max={80} value={lo} onChange={(ev) => handleRange('lo', Number(ev.target.value))} />
-        <label className="sr-only" htmlFor="fm-hi">최대 점수</label>
-        <input id="fm-hi" type="range" min={20} max={80} value={hi} onChange={(ev) => handleRange('hi', Number(ev.target.value))} />
+        <div className="dual-range">
+          <div className="dual-range-track" />
+          <div className="dual-range-fill" style={{ left: `${((lo - 20) / 60) * 100}%`, right: `${100 - ((hi - 20) / 60) * 100}%` }} />
+          <label className="sr-only" htmlFor="fm-lo">최소 점수</label>
+          <input id="fm-lo" type="range" min={20} max={hi} value={lo} onChange={(ev) => handleRange('lo', Number(ev.target.value))} />
+          <label className="sr-only" htmlFor="fm-hi">최대 점수</label>
+          <input id="fm-hi" type="range" min={lo} max={80} value={hi} onChange={(ev) => handleRange('hi', Number(ev.target.value))} />
+        </div>
       </div>
       <p className="small-text">{t.length ? `${lo}~${hi}점 · 원자료 중 ${count.toLocaleString()}명` : '아직 범위를 고르지 않았습니다. 전체 점수가 포함됩니다.'}</p>
     </>

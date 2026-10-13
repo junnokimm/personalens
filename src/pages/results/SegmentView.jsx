@@ -1,5 +1,3 @@
-import { useSearchParams } from 'react-router-dom'
-
 import { KoreaMapFull } from '../../components/map/KoreaMap.jsx'
 import PairBars from '../../components/charts/PairBars.jsx'
 import SegGap from '../../components/charts/SegGap.jsx'
@@ -8,17 +6,16 @@ import { CONFIG } from '../../lib/config.js'
 import { ANALYSIS_KEYS, attrLabel, attrValue, sortValues } from '../../lib/schema.js'
 import { answerText, qLabel } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
-import { pct } from '../../utils/format.js'
+import { displayAttrValue, pct } from '../../utils/format.js'
+import { useResultUrl } from './ResultUrlContext.jsx'
+import { drillFilters } from './resultUrlState.js'
 import Trail from './Trail.jsx'
 
 const shade = (q, i) => (q.type === 'likert' ? 's' + (Math.round((i / (q.scale - 1)) * 4) + 1) : 'sc')
 
 /* 원본 segmentView()/startSegment()/drillFilters()/narrow()/toPersonas() */
 export default function SegmentView({ run }) {
-  const [, setSearchParams] = useSearchParams()
-  const qid = useUiStore((s) => s.qid)
-  const drill = useUiStore((s) => s.drill)
-  const segKey = useUiStore((s) => s.segKey)
+  const { qid, drill, segKey, navigateResult } = useResultUrl()
   const segMode = useUiStore((s) => s.segMode)
   const mapColor = useUiStore((s) => s.mapColor)
   const setResultsUi = useUiStore((s) => s.setResultsUi)
@@ -29,12 +26,8 @@ export default function SegmentView({ run }) {
   const q = run.survey.questions.find((x) => x.id === effectiveQid)
   const dist = distribution(run, q.id)
 
-  const drillFilters = () => {
-    const f = drill.answer !== null ? { ['resp:' + q.id]: [String(drill.answer)] } : {}
-    for (const a of drill.attrs) f[a.key] = [a.value]
-    return f
-  }
-  const people = filterPeople(run, drillFilters())
+  const activeFilters = drillFilters(q.id, drill)
+  const people = filterPeople(run, activeFilters)
   const baseF = {}
   for (const a of drill.attrs) baseF[a.key] = [a.value]
   const base = filterPeople(run, baseF)
@@ -53,28 +46,30 @@ export default function SegmentView({ run }) {
   })
   const effectiveSegMode = segMode === 'map' && effectiveSegKey !== 'region' ? 'table' : segMode
   const baseDesc = drill.attrs.length
-    ? `${drill.attrs.map((a) => attrLabel(a.key) + ' ' + a.value).join(', ')} 전체 (${qLabel(run.survey, q)} 응답과 관계없이)`
+    ? `${drill.attrs.map((a) => attrLabel(a.key) + ' ' + displayAttrValue(a.key, a.value)).join(', ')} 전체 (${qLabel(run.survey, q)} 응답과 관계없이)`
     : '전체 응답자'
 
   function resetDrill() {
-    setResultsUi({ drill: { answer: null, attrs: [] } })
-    setSearchParams({ view: 'overall' })
+    navigateResult({ view: 'overall', drill: { answer: null, attrs: [] } })
   }
   function trimAttrs(n) {
-    setResultsUi({ drill: { ...drill, attrs: drill.attrs.slice(0, n) } })
+    navigateResult({ drill: { ...drill, attrs: drill.attrs.slice(0, n) } })
   }
   function startSegment(i) {
-    setResultsUi({ drill: { answer: i, attrs: [] }, segKey: ANALYSIS_KEYS[0] })
+    navigateResult({ drill: { answer: i, attrs: [] }, segKey: ANALYSIS_KEYS[0] })
   }
   function narrow(value) {
-    setResultsUi({ drill: { ...drill, attrs: [...drill.attrs, { key: effectiveSegKey, value }] } })
+    const attrs = [...drill.attrs, { key: effectiveSegKey, value }]
+    const nextSegKey = ANALYSIS_KEYS.find((key) => !attrs.some((item) => item.key === key)) || ANALYSIS_KEYS[0]
+    navigateResult({ drill: { ...drill, attrs }, segKey: nextSegKey })
   }
   function toPersonas() {
-    setResultsUi({ pf: drillFilters(), pSearch: '', pPage: 0, respCol: q.id })
-    setSearchParams({ view: 'personas' })
+    setResultsUi({ pf: activeFilters, pSearch: '', pPage: 0, respCol: q.id })
+    navigateResult({ view: 'personas', personaId: null })
   }
   function changeSegKey(key) {
-    setResultsUi({ segKey: key, segMode: key === 'region' ? 'map' : effectiveSegMode === 'map' ? 'table' : effectiveSegMode })
+    setResultsUi({ segMode: key === 'region' ? 'map' : effectiveSegMode === 'map' ? 'table' : effectiveSegMode })
+    navigateResult({ segKey: key })
   }
 
   const strip = (
@@ -99,7 +94,7 @@ export default function SegmentView({ run }) {
             const c = Math.round(x.pa * people.length / 100)
             return (
               <tr key={x.v} className={c < CONFIG.MIN_CELL ? 'thin' : ''}>
-                <td>{x.v}</td>
+                <td>{displayAttrValue(effectiveSegKey, x.v)}</td>
                 <td><b>{c}명</b> · {pct(x.pa)}</td>
                 <td>{pct(x.pb)}</td>
                 <td><PairBars aPercent={x.pa} bPercent={x.pb} bClassName="pbase" /></td>
@@ -117,7 +112,7 @@ export default function SegmentView({ run }) {
     <div className="seg-chart">
       {rows.map((x) => (
         <div className="seg-bar" key={x.v}>
-          <span className="v">{x.v}</span>
+          <span className="v">{displayAttrValue(effectiveSegKey, x.v)}</span>
           <div className="track wide"><i className="pa" style={{ width: `${x.pa}%` }} /><em className="marker" style={{ left: `${x.pb}%` }} title={`비교 기준 ${pct(x.pb)}`} /></div>
           <span className="n">{pct(x.pa)} <small>기준 {pct(x.pb)}</small></span>
           <SegGap gap={x.gap} small={Math.round(x.pa * people.length / 100) < CONFIG.MIN_CELL} />

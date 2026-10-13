@@ -23,6 +23,9 @@ export default function FilterModal({ opts }) {
   const [optSearch, setOptSearch] = useState('')
   const [limit, setLimit] = useState(120)
   const [active, setActive] = useState(opts.start || fields[0]?.key)
+  /* 760px 이하에서는 목록과 편집 화면을 동시에 보여주지 않고 한 번에 하나만 보여준다(CSS로 전환).
+   * 데스크톱에서는 이 값이 쓰이지 않는다(두 영역이 항상 같이 보임) */
+  const [mobileEditorOpen, setMobileEditorOpen] = useState(false)
 
   function snapshot() { setHistory((h) => [...h, clone(draft)].slice(-30)) }
   function undo() {
@@ -78,7 +81,7 @@ export default function FilterModal({ opts }) {
   const groups = [...new Set(filteredFields.map((f) => f.group))]
 
   return (
-    <Modal className="fm" onClose={closeFilterModal} labelledBy="fm-title">
+    <Modal className="fm" onClose={closeFilterModal} labelledBy="fm-title" initialFocus="fm-search">
       <div className="modal-head">
         <h2 id="fm-title">{opts.title}</h2>
         <button className="small" onClick={closeFilterModal}>닫기</button>
@@ -87,9 +90,9 @@ export default function FilterModal({ opts }) {
         <FilterChips filters={draft} ctx={{ mode: opts.mode, run: opts.run, empty: '아직 고른 조건이 없습니다.' }} onRemove={removeField} />
         <p className="fm-rule">같은 항목 안의 값은 <b>또는</b>, 서로 다른 항목끼리는 <b>그리고</b>로 묶입니다.</p>
       </div>
-      <div className="fm-body">
+      <div className={`fm-body ${mobileEditorOpen ? 'show-editor' : 'show-list'}`}>
         <div className="fm-list">
-          <input id="fm-search" placeholder="조건 항목 검색" aria-label="조건 항목 검색" value={search} onChange={(ev) => setSearch(ev.target.value)} autoFocus />
+          <input id="fm-search" placeholder="조건 항목 검색" aria-label="조건 항목 검색" value={search} onChange={(ev) => setSearch(ev.target.value)} />
           <div id="fm-list-items">
             {!filteredFields.length ? <p className="muted small-text">검색 결과가 없습니다.</p> : groups.map((g) => (
               <Fragment key={g}>
@@ -97,7 +100,7 @@ export default function FilterModal({ opts }) {
                 {filteredFields.filter((f) => f.group === g).map((f) => {
                   const n = draft[f.key]?.length || 0
                   return (
-                    <button key={f.key} className={`fm-field ${active === f.key ? 'on' : ''}`} onClick={() => { setActive(f.key); setOptSearch(''); setLimit(120) }}>
+                    <button key={f.key} className={`fm-field ${active === f.key ? 'on' : ''}`} onClick={() => { setActive(f.key); setOptSearch(''); setLimit(120); setMobileEditorOpen(true) }}>
                       <span>{f.label}</span>
                       {n ? <em>{f.type === 'big5' ? '범위' : n}</em> : null}
                     </button>
@@ -115,6 +118,7 @@ export default function FilterModal({ opts }) {
             draft={draft}
             optSearch={optSearch}
             limit={limit}
+            onBack={() => setMobileEditorOpen(false)}
             onRemoveField={removeField}
             onSetOptSearch={(v) => { setOptSearch(v); setLimit(120) }}
             onMoreLimit={() => setLimit((l) => l + 120)}
@@ -141,13 +145,16 @@ export default function FilterModal({ opts }) {
 }
 
 /* 원본 fmEditorHtml() */
-function FieldEditor({ opts, base, field: f, draft, optSearch, limit, onRemoveField, onSetOptSearch, onMoreLimit, onKeywords, onToggleOption, onSelectShown, onBig5LevelClick, onBig5RangeChange, onRegionSnapshot, onRegionChange }) {
+function FieldEditor({ opts, base, field: f, draft, optSearch, limit, onBack, onRemoveField, onSetOptSearch, onMoreLimit, onKeywords, onToggleOption, onSelectShown, onBig5LevelClick, onBig5RangeChange, onRegionSnapshot, onRegionChange }) {
   const sel = draft[f.key] || []
   const head = (
-    <div className="fm-edit-head">
-      <h3>{f.label}</h3>
-      {sel.length ? <button className="link" onClick={() => onRemoveField(f.key)}>이 항목 해제</button> : null}
-    </div>
+    <>
+      <button className="small fm-back" onClick={onBack}>← 항목 목록</button>
+      <div className="fm-edit-head">
+        <h3>{f.label}</h3>
+        {sel.length ? <button className="link" onClick={() => onRemoveField(f.key)}>이 항목 해제</button> : null}
+      </div>
+    </>
   )
   if (f.type === 'text') {
     return (

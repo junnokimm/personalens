@@ -1,15 +1,21 @@
+import { Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
 import StatusTag from '../../components/common/StatusTag.jsx'
 import FilterChips from '../../components/filters/FilterChips.jsx'
-import { groupStale } from '../../lib/cohort.js'
-import { validateSurvey, versionText } from '../../lib/survey.js'
+import { groupFlowState, groupStale } from '../../lib/cohort.js'
+import { surveyFlowState, validateSurvey, versionText } from '../../lib/survey.js'
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { stamp } from '../../utils/format.js'
 import RunRow from './RunRow.jsx'
+
+/* 1)의 상태 코드에 맞춘 요약 화면용 짧은 문구 — 코드별로 설문·대상 집단에서 한 쌍씩 */
+const SURVEY_STEP_LABEL = { empty: '작성 전', error: '확인 필요', changed: '변경됨', ready: '준비 완료' }
+const GROUP_STEP_LABEL = { invalid: '인원 수 확인 필요', unbuilt: '구성 전', stale: '재구성 필요', built: '구성 완료' }
+const TAG_CLASS = { bad: 'bad', warn: 'warn', info: 'info', todo: '' }
 
 /* 원본 summary() */
 export default function SummaryPage() {
@@ -17,13 +23,28 @@ export default function SummaryPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
-  const setResultsUi = useUiStore((s) => s.setResultsUi)
 
   const last = project.runs[0]
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
   const errs = validateSurvey(project.survey).summary
   const qs = project.survey.questions
   const follow = qs.filter((q) => q.parentId).length
+  const hasRuns = project.runs.length > 0
+  const completedRuns = project.runs.filter((r) => r.status === 'completed').length
+  const surveyFlow = surveyFlowState(project.survey, hasRuns)
+  const groupFlow = groupFlowState(g)
+
+  const steps = [
+    { key: 'survey', label: '설문', state: SURVEY_STEP_LABEL[surveyFlow.code], tone: surveyFlow.tone, to: `/p/${project.id}/design/survey` },
+    { key: 'group', label: '대상 집단', state: GROUP_STEP_LABEL[groupFlow.code], tone: groupFlow.tone, to: `/p/${project.id}/design/target` },
+    { key: 'sim', label: '시뮬레이션', state: hasRuns ? `실행 완료 ${completedRuns}건` : '실행 기록 없음', tone: hasRuns ? 'info' : 'todo', to: `/p/${project.id}/simulation` },
+  ]
+  const ready = surveyFlow.ready && groupFlow.ready
+  const cta = ready
+    ? { label: '새 시뮬레이션', to: `/p/${project.id}/simulation` }
+    : !surveyFlow.ready
+      ? { label: '설문 계속 작성하기', to: `/p/${project.id}/design/survey` }
+      : { label: '대상 집단 구성하기', to: `/p/${project.id}/design/target` }
   const chats = Object.entries(project.chats)
     .filter(([, v]) => v.length)
     .map(([k, v]) => { const [rid, pid] = k.split('::'); return { rid, pid, n: v.length, at: v[v.length - 1].created } })
@@ -35,16 +56,30 @@ export default function SummaryPage() {
     navigate(`/p/${project.id}/results/${runId}`)
   }
   function openChat(runId, personaId) {
-    resetResultsUi(project.runs.find((r) => r.id === runId))
-    setResultsUi({ personaId })
-    navigate(`/p/${project.id}/results/${runId}?view=chat`)
+    const run = project.runs.find((item) => item.id === runId)
+    resetResultsUi(run)
+    const qid = run.survey.questions.find((item) => item.type !== 'text')?.id || run.survey.questions[0].id
+    const params = new URLSearchParams({ view: 'chat', run: run.id, q: qid, seg: 'sex', persona: personaId, chatQ: qid })
+    navigate(`/p/${project.id}/results/${runId}?${params}`)
   }
 
   return (
     <>
       <PageHead title={project.name} sub={project.description || ''}>
-        <button className="primary" onClick={() => navigate(`/p/${project.id}/simulation`)}>새 시뮬레이션</button>
+        <button className="primary" onClick={() => navigate(cta.to)}>{cta.label}</button>
       </PageHead>
+      <section className="card step-flow">
+        {steps.map((step, i) => (
+          <Fragment key={step.key}>
+            <button className="step" onClick={() => navigate(step.to)}>
+              <span className="step-n">{i + 1}</span>
+              <span>{step.label}</span>
+              <span className={`tag ${TAG_CLASS[step.tone]}`}>{step.state}</span>
+            </button>
+            {i < steps.length - 1 ? <span className="step-arrow">→</span> : null}
+          </Fragment>
+        ))}
+      </section>
       {project.survey.draft && project.runs.length ? (
         <Banner
           tone="warn"
@@ -69,7 +104,7 @@ export default function SummaryPage() {
           <button className="small" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단 열기</button>
         </section>
         <section className="card sum">
-          <h2>최근 실행</h2>
+          <h2>마지막 실행</h2>
           {last ? (
             <>
               <p className="big">실행 #{last.number} <StatusTag run={last} /></p>

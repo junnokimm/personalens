@@ -1,64 +1,33 @@
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import PageHead from '../../components/common/PageHead.jsx'
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
-import { stamp } from '../../utils/format.js'
+import { josa, stamp } from '../../utils/format.js'
 import ChatView from './ChatView.jsx'
 import DetailView from './DetailView.jsx'
 import ExportView from './ExportView.jsx'
 import OverallView from './OverallView.jsx'
 import PersonasView from './PersonasView.jsx'
+import { ResultUrlProvider, useResultUrl } from './ResultUrlContext.jsx'
 import SegmentView from './SegmentView.jsx'
 
-/* 원본 results()/openRun() — 실행 정보 띠, 탭 3개, 아래는 view에 따른 화면 */
-export default function ResultsPage() {
-  const { projectId, runId } = useParams()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const project = useProject(projectId)
-  const resetResultsUi = useUiStore((s) => s.resetResultsUi)
-  const drill = useUiStore((s) => s.drill)
-
-  const run = project.runs.find((r) => r.id === runId)
-  const view = searchParams.get('view') || 'overall'
-
-  function selectRun(id) {
-    resetResultsUi(project.runs.find((r) => r.id === id))
-    navigate(`/p/${project.id}/results/${id}`)
-  }
-
-  if (!run) {
-    return (
-      <>
-        <PageHead title="결과" sub="" />
-        <section className="card empty">완료된 실행이 없습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/simulation`)}>시뮬레이션 실행하기</button></section>
-      </>
-    )
-  }
-  if (run.status !== 'completed') {
-    return (
-      <>
-        <PageHead title="결과" sub="" />
-        <section className="card empty">
-          실행 #{run.number}은 {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
-        </section>
-      </>
-    )
-  }
-
-  const done = project.runs.filter((x) => x.status === 'completed')
+function CompletedResults({ project, run, done, onSelectRun }) {
+  const { view, drill, navigateResult } = useResultUrl()
   const tabGroup = ['overall', 'segment'].includes(view) ? 'overall' : view === 'export' ? 'export' : 'people'
   const tabDefs = [['overall', '전체 결과'], ['people', '페르소나'], ['export', '내보내기']]
 
-  function setView(v) { setSearchParams({ view: v }) }
+  function setView(key) {
+    const nextView = key === 'overall' ? (drill.answer !== null ? 'segment' : 'overall') : key === 'people' ? 'personas' : 'export'
+    navigateResult({ view: nextView, personaId: null, chatQid: null })
+  }
 
   return (
     <>
       <PageHead title="결과" sub="응답 분포에서 시작해 세부 집단과 페르소나까지 좁혀 봅니다." />
       <div className="run-strip">
         <label><span>실행</span>
-          <select aria-label="실행 선택" value={run.id} onChange={(ev) => selectRun(ev.target.value)}>
+          <select aria-label="실행 선택" value={run.id} onChange={(ev) => onSelectRun(ev.target.value)}>
             {done.map((x) => <option key={x.id} value={x.id}>실행 #{x.number} · {stamp(x.created)}</option>)}
           </select>
         </label>
@@ -73,7 +42,7 @@ export default function ResultsPage() {
             role="tab"
             aria-selected={tabGroup === k}
             className={tabGroup === k ? 'on' : ''}
-            onClick={() => setView(k === 'overall' ? (drill.answer !== null ? 'segment' : 'overall') : k === 'people' ? 'personas' : 'export')}
+            onClick={() => setView(k)}
           >
             {l}
           </button>
@@ -86,5 +55,58 @@ export default function ResultsPage() {
         : view === 'chat' ? <ChatView project={project} run={run} />
         : <OverallView run={run} />}
     </>
+  )
+}
+
+/* 원본 results()/openRun() — 실행 정보 띠, 탭 3개, 아래는 view에 따른 화면 */
+export default function ResultsPage() {
+  const { projectId, runId } = useParams()
+  const navigate = useNavigate()
+  const project = useProject(projectId)
+  const resetResultsUi = useUiStore((s) => s.resetResultsUi)
+  const run = project.runs.find((item) => item.id === runId)
+  const done = project.runs.filter((item) => item.status === 'completed')
+
+  function selectRun(id) {
+    resetResultsUi(project.runs.find((item) => item.id === id))
+    navigate(`/p/${project.id}/results/${id}`)
+  }
+
+  if (!runId) {
+    if (done.length) return <Navigate to={`/p/${project.id}/results/${done[0].id}`} replace />
+    return (
+      <>
+        <PageHead title="결과" sub="" />
+        <section className="card empty">완료된 실행이 없습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/simulation`)}>시뮬레이션 실행하기</button></section>
+      </>
+    )
+  }
+  if (!run) {
+    return (
+      <>
+        <PageHead title="결과" sub="" />
+        <section className="card empty">
+          이 실행을 찾을 수 없습니다.
+          {done.length ? <> <button className="link" onClick={() => selectRun(done[0].id)}>최근 결과 보기</button></> : null}
+          {' '}<button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
+        </section>
+      </>
+    )
+  }
+  if (run.status !== 'completed') {
+    return (
+      <>
+        <PageHead title="결과" sub="" />
+        <section className="card empty">
+          실행 #{run.number}{josa(run.number, ['은', '는'])} {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
+        </section>
+      </>
+    )
+  }
+
+  return (
+    <ResultUrlProvider run={run}>
+      <CompletedResults project={project} run={run} done={done} onSelectRun={selectRun} />
+    </ResultUrlProvider>
   )
 }

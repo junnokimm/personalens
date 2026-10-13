@@ -2,7 +2,7 @@ import KoreaMap from '../../components/map/KoreaMap.jsx'
 import { breakdown } from '../../lib/analysis.js'
 import { ANALYSIS_KEYS, attrLabel, attrValue, BIG5, districtName } from '../../lib/schema.js'
 import { useUiStore } from '../../store/useUiStore.js'
-import { pct } from '../../utils/format.js'
+import { displayAttrValue, displayRegion, pct } from '../../utils/format.js'
 
 /* 원본 groupPreview() */
 export default function GroupPreview({ group, stale }) {
@@ -22,7 +22,7 @@ export default function GroupPreview({ group, stale }) {
     <>
       <section className={`card ${stale ? 'dim' : ''}`}>
         <div className="card-top">
-          <h2>분포 미리보기 · {people.length}명</h2>
+          <h2>분포 미리보기 · {people.length}명{stale ? <span className="muted small-text"> · 이전 조건 기준</span> : null}</h2>
           <label className="inline-sel">
             기준
             <select aria-label="분포 기준" value={effectiveDistKey} onChange={(ev) => setResultsUi({ distKey: ev.target.value })}>
@@ -35,7 +35,7 @@ export default function GroupPreview({ group, stale }) {
           <div className="dist">
             {rows.map((r) => (
               <div className="dist-row" key={r.value}>
-                <span>{r.value}</span>
+                <span>{displayAttrValue(effectiveDistKey, r.value)}</span>
                 <div className="track"><i style={{ width: `${(r.percent / max) * 100}%` }} /></div>
                 <span className="num">{r.count}명 · {pct(r.percent)}</span>
               </div>
@@ -49,7 +49,7 @@ export default function GroupPreview({ group, stale }) {
           {people.slice(0, 6).map((p) => (
             <div className="mini" key={p.id}>
               <b>{p.id} · {attrValue(p, 'age')} {attrValue(p, 'sex')}</b>
-              <span>{attrValue(p, 'region')} {districtName(p.attributes.district)}</span>
+              <span>{displayRegion(p.attributes.region)} {districtName(p.attributes.district)}</span>
               <span>{p.attributes.occupation}</span>
               <span>소득 {attrValue(p, 'income_bracket')}</span>
               <div className="chips">{traits(p).map((t) => <span className="chip" key={t}>{t}</span>)}</div>

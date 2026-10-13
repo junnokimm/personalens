@@ -1,12 +1,12 @@
 import { Fragment } from 'react'
-import { useSearchParams } from 'react-router-dom'
 
 import { filterPeople } from '../../lib/analysis.js'
+import { useResultUrl } from './ResultUrlContext.jsx'
 
 /* 원본 peopleTrail() — DetailView·ChatView가 함께 쓰는 탐색 경로. 첫 단계는 항상 "페르소나 목록" */
 export default function PeopleTrail({ run, pf, steps = [] }) {
-  const [, setSearchParams] = useSearchParams()
-  const all = [{ label: '페르소나 목록', n: filterPeople(run, pf).length, onClick: () => setSearchParams({ view: 'personas' }) }, ...steps]
+  const { navigateResult } = useResultUrl()
+  const all = [{ label: '페르소나 목록', n: filterPeople(run, pf).length, onClick: () => navigateResult({ view: 'personas', personaId: null, chatQid: null }) }, ...steps]
   return (
     <nav className="trail" aria-label="탐색 경로">
       {all.map((s, i) => (

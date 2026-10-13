@@ -338,6 +338,11 @@ export const useProjectStore = create(
         ...currentState,
         projects: migrateProjects(persistedState?.projects),
       }),
+      /* merge()가 만든 예시 데이터·failed 전환은 다음 set() 전까지 메모리에만 있다.
+         불러온 직후 한 번 그대로 다시 써서, 새로고침해도 같은 프로젝트가 열리게 한다 */
+      onRehydrateStorage: () => (state) => {
+        if (state) storage.setItem(STORE_KEY, { state: { projects: state.projects } })
+      },
     },
   ),
 )

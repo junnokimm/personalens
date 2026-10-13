@@ -1,11 +1,9 @@
-import { useSearchParams } from 'react-router-dom'
-
 import { ANALYSIS_KEYS } from '../../lib/schema.js'
 import { distribution, responseStats, validResponses } from '../../lib/analysis.js'
 import { TYPE_LABEL, qLabel } from '../../lib/survey.js'
-import { useUiStore } from '../../store/useUiStore.js'
 import { pct } from '../../utils/format.js'
 import QuestionTabs from './QuestionTabs.jsx'
+import { useResultUrl } from './ResultUrlContext.jsx'
 import ResponseComparison from './ResponseComparison.jsx'
 
 const shade = (q, i) => (q.type === 'likert' ? 's' + (Math.round((i / (q.scale - 1)) * 4) + 1) : 'sc')
@@ -26,9 +24,7 @@ function QuestionHead({ run, q }) {
 
 /* 원본 overallView() — qid가 없거나 이 실행의 문항이 아니면(실행을 바꿨을 때) 첫 비주관식 문항을 기본값으로 삼는다 */
 export default function OverallView({ run }) {
-  const [, setSearchParams] = useSearchParams()
-  const qid = useUiStore((s) => s.qid)
-  const setResultsUi = useUiStore((s) => s.setResultsUi)
+  const { qid, navigateResult } = useResultUrl()
 
   const effectiveQid = qid && run.survey.questions.some((x) => x.id === qid)
     ? qid
@@ -37,16 +33,13 @@ export default function OverallView({ run }) {
   const stats = responseStats(run, q.id)
 
   function pickQ(id) {
-    setResultsUi({ qid: id, drill: { answer: null, attrs: [] } })
-    setSearchParams({ view: 'overall' })
+    navigateResult({ view: 'overall', qid: id, drill: { answer: null, attrs: [] }, personaId: null, chatQid: id })
   }
   function startSegment(i) {
-    setResultsUi({ qid: effectiveQid, drill: { answer: i, attrs: [] }, segKey: ANALYSIS_KEYS[0] })
-    setSearchParams({ view: 'segment' })
+    navigateResult({ view: 'segment', qid: effectiveQid, drill: { answer: i, attrs: [] }, segKey: ANALYSIS_KEYS[0], personaId: null })
   }
   function openPersona(personaId) {
-    setResultsUi({ personaId })
-    setSearchParams({ view: 'detail' })
+    navigateResult({ view: 'detail', personaId })
   }
 
   if (q.type === 'text') {

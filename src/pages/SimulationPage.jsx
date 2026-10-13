@@ -3,12 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Banner from '../components/common/Banner.jsx'
 import PageHead from '../components/common/PageHead.jsx'
 import FilterChips from '../components/filters/FilterChips.jsx'
-import { groupStale } from '../lib/cohort.js'
+import { groupError, groupFlowState, groupStale } from '../lib/cohort.js'
 import { validateSurvey } from '../lib/survey.js'
 import RunRow from './overview/RunRow.jsx'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
 import { startRun } from '../store/useSimulationJob.js'
 import { useUiStore } from '../store/useUiStore.js'
+import { josa } from '../utils/format.js'
 
 /* 원본 sameAsRun() */
 function sameAsRun(project, g) {
@@ -24,16 +25,15 @@ export default function SimulationPage() {
   const project = useProject(projectId)
   const navigate = useNavigate()
   const selectGroup = useProjectStore((s) => s.selectGroup)
-  const failNext = useUiStore((s) => s.failNext)
-  const setFailNext = useUiStore((s) => s.setFailNext)
   const openConfirm = useUiStore((s) => s.openConfirm)
   const closeConfirm = useUiStore((s) => s.closeConfirm)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
 
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
   const errs = validateSurvey(project.survey).summary
+  const groupErr = groupError(g)
   const stale = groupStale(g)
-  const ready = !errs.length && !stale
+  const ready = !errs.length && !groupErr && !stale
   const nQ = project.survey.questions.length
   const same = ready ? sameAsRun(project, g) : null
   const last = project.runs.find((r) => r.status === 'completed')
@@ -78,20 +78,23 @@ export default function SimulationPage() {
           <div className="card-top"><h2>설문</h2><button className="small" onClick={() => navigate(`/p/${project.id}/design/survey`)}>설계에서 수정</button></div>
           <p className="big">{project.survey.title || '주제 미입력'}</p>
           <p className="muted">{project.survey.draft || !project.survey.version ? `v${project.survey.version + 1}로 확정되어 실행됩니다` : `v${project.survey.version}`} · 문항 {nQ}개</p>
-          {errs.length ? <p className="err-text">확인할 내용 {errs.length}개 · {errs[0].msg}</p> : <p className="ok-text">준비됨</p>}
+          {errs.length ? <p className="err-text">확인할 내용 {errs.length}개 · {errs[0].msg}</p> : <p className="ok-text">실행 준비 완료</p>}
         </section>
         <section className="card">
           <div className="card-top"><h2>대상 집단</h2><button className="small" onClick={() => navigate(`/p/${project.id}/design/target`)}>설계에서 수정</button></div>
           <div className="field">
             <label htmlFor="sim-group">실행할 대상 집단</label>
             <select id="sim-group" value={g.id} onChange={(ev) => selectGroup(project.id, ev.target.value)}>
-              {project.groups.map((x) => (
-                <option key={x.id} value={x.id}>{x.name} · {x.count}명{groupStale(x) ? ' (구성 필요)' : ''}</option>
-              ))}
+              {project.groups.map((x) => {
+                const xFlow = groupFlowState(x)
+                return <option key={x.id} value={x.id}>{x.name} · {x.count}명{xFlow.ready ? '' : ` (${xFlow.label})`}</option>
+              })}
             </select>
           </div>
           <FilterChips filters={g.filters} />
-          {stale ? <p className="err-text">이 집단은 현재 조건으로 구성되지 않았습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단에서 구성</button></p> : <p className="ok-text">준비됨</p>}
+          {groupErr ? <p className="err-text">{groupErr} <button className="link" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단에서 수정</button></p>
+            : stale ? <p className="err-text">이 집단은 현재 조건으로 구성되지 않았습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단에서 구성</button></p>
+              : <p className="ok-text">실행 준비 완료</p>}
         </section>
       </div>
       <section className="card run-card">
@@ -100,11 +103,11 @@ export default function SimulationPage() {
             <h2>실행</h2>
             <p className="muted">{g.count}명 × 문항 {nQ}개 = 예상 응답 <b>{(g.count * nQ).toLocaleString()}개</b></p>
           </div>
-          <span className={`tag ${ready ? 'ok' : 'bad'}`}>{ready ? '실행 가능' : '설계 확인 필요'}</span>
+          <span className={`tag ${running ? 'info' : ready ? 'ok' : 'bad'}`}>{running ? '실행 중' : ready ? '실행 준비 완료' : '설계 확인 필요'}</span>
         </div>
-        {diffs.length ? <p className="small-text muted">실행 #{last.number}과 비교 · {diffs.join(' · ')}</p> : null}
+        {diffs.length ? <p className="small-text muted">실행 #{last.number}{josa(last.number, ['과', '와'])} 비교 · {diffs.join(' · ')}</p> : null}
         {running ? (
-          <Banner tone="info">실행 #{running.number}이 진행 중입니다 ({running.progress}%). 다른 화면으로 이동해도 계속되고, 끝나면 알림이 뜹니다. 한 번에 하나씩 실행할 수 있습니다.</Banner>
+          <Banner tone="info">실행 #{running.number}{josa(running.number, ['이', '가'])} 진행 중입니다 ({running.progress}%). 다른 화면으로 이동해도 계속되고, 끝나면 알림이 뜹니다. 한 번에 하나씩 실행할 수 있습니다.</Banner>
         ) : same ? (
           <Banner
             tone="info"
@@ -115,17 +118,11 @@ export default function SimulationPage() {
               </>
             )}
           >
-            실행 #{same.number}과 설정이 같습니다. 시연 생성기는 같은 결과를 냅니다.
+            실행 #{same.number}{josa(same.number, ['과', '와'])} 설정이 같습니다. 시연 생성기는 같은 결과를 냅니다.
           </Banner>
         ) : (
           <button className="primary" disabled={!ready} onClick={handleConfirmRun}>시뮬레이션 실행</button>
         )}
-        <details className="demo">
-          <summary>시연 옵션</summary>
-          <label className="check">
-            <input type="checkbox" checked={failNext} onChange={(ev) => setFailNext(ev.target.checked)} /> 다음 실행을 60%에서 실패시키기 (실패·다시 시도 확인용)
-          </label>
-        </details>
       </section>
       <section className="card">
         <div className="card-top"><h2>최근 실행</h2><button className="small" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 전체</button></div>

@@ -2,6 +2,8 @@
  * useProjectStore와 마찬가지로 모듈 싱글턴이라 vi.resetModules()로 매번 새로 가져온다. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { josa } from '../src/utils/format.js'
+
 beforeEach(() => {
   localStorage.clear()
   vi.resetModules()
@@ -20,14 +22,14 @@ describe('useSimulationJob', () => {
 
     const result = startRun(projectId)
     expect(result.ok).toBe(true)
-    expect(useUiStore.getState().toast?.text).toBe(`실행 #${result.runNumber}을 시작했습니다.`)
+    expect(useUiStore.getState().toast?.text).toBe(`실행 #${result.runNumber}${josa(result.runNumber, ['을', '를'])} 시작했습니다.`)
 
     vi.advanceTimersByTime(450 * 10)
 
     const run = useProjectStore.getState().projects.find((p) => p.id === projectId).runs.find((r) => r.id === result.runId)
     expect(run.status).toBe('completed')
     expect(useUiStore.getState().toast).toEqual({
-      text: `실행 #${result.runNumber}이 완료됐습니다.`,
+      text: `실행 #${result.runNumber}${josa(result.runNumber, ['이', '가'])} 완료됐습니다.`,
       actionLabel: '결과 보기',
       action: { to: `/p/${projectId}/results/${result.runId}` },
     })

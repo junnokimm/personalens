@@ -1,17 +1,21 @@
-import { useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
-import { validateSurvey, versionText } from '../../lib/survey.js'
+import { surveyFlowState, validateSurvey, versionText } from '../../lib/survey.js'
 import { useProject, useProjectStore } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import QuestionBlock from './QuestionBlock.jsx'
+import SurveyPreviewModal from './SurveyPreviewModal.jsx'
 import { useFocusAfterRender } from './useFocusAfterRender.js'
 
 /* 원본 surveyPage() */
 export default function SurveyPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
+  const navigate = useNavigate()
+  const [previewOpen, setPreviewOpen] = useState(false)
   const editS = useProjectStore((s) => s.editS)
   const addQ = useProjectStore((s) => s.addQ)
   const restoreVersion = useProjectStore((s) => s.restoreVersion)
@@ -23,6 +27,7 @@ export default function SurveyPage() {
 
   const s = project.survey
   const v = validateSurvey(s)
+  const flow = surveyFlowState(s, project.runs.length > 0)
   const hist = s.history || []
   const used = (ver) => project.runs.filter((r) => r.survey.version === ver).length
 
@@ -51,7 +56,7 @@ export default function SurveyPage() {
     focusAfterRender(`q-${qid}`, 'scroll')
   }
 
-  const verSel = (
+  const verSel = hist.length ? (
     <label className="ver">
       <span>버전</span>
       <select aria-label="설문 버전" value="" onChange={handleRestoreVersion}>
@@ -61,6 +66,11 @@ export default function SurveyPage() {
         ))}
       </select>
     </label>
+  ) : (
+    <span className="ver">
+      <span>버전</span>
+      <b>{versionText(s)}</b>
+    </span>
   )
 
   const verNote = s.draft && s.version
@@ -74,15 +84,21 @@ export default function SurveyPage() {
   return (
     <>
       <PageHead title="설문" sub="문항을 만들고 순서를 정합니다. 버전은 입력할 때가 아니라 실행할 때 확정됩니다.">
+        <button onClick={() => setPreviewOpen(true)}>설문 미리보기</button>
         {verSel}
       </PageHead>
       <div className="ver-line">{verNote}</div>
-      {v.summary.length ? (
+      {flow.code === 'empty' ? (
+        <Banner tone="todo">
+          <b>먼저 설문 주제를 정해 보세요</b>
+          <p className="small-text">주제를 입력한 뒤 아래 버튼으로 문항을 추가하세요. 척도형·단일선택·주관식 중에서 고를 수 있습니다.</p>
+        </Banner>
+      ) : v.summary.length ? (
         <Banner tone="bad">
           <b>확인할 내용 {v.summary.length}개</b>
           <ul>
-            {v.summary.slice(0, 4).map((e, i) => (
-              <li key={i}>{e.msg}{e.qid ? <> <button className="link" onClick={() => handleFocusError(e.qid)}>이동</button></> : null}</li>
+            {v.summary.slice(0, 4).map((e) => (
+              <li key={`${e.qid || 'survey'}:${e.msg}`}>{e.msg}{e.qid ? <> <button className="link" onClick={() => handleFocusError(e.qid)}>이동</button></> : null}</li>
             ))}
           </ul>
         </Banner>
@@ -93,7 +109,7 @@ export default function SurveyPage() {
         <div className="grid2">
           <div className="field">
             <label htmlFor="s-title">주제</label>
-            <input id="s-title" value={s.title} className={!s.title.trim() ? 'invalid' : ''} onChange={(ev) => editS(project.id, 'title', ev.target.value)} />
+            <input id="s-title" value={s.title} className={!s.title.trim() && flow.code !== 'empty' ? 'invalid' : ''} onChange={(ev) => editS(project.id, 'title', ev.target.value)} />
           </div>
           <div className="field">
             <label htmlFor="s-desc">목적</label>
@@ -105,7 +121,7 @@ export default function SurveyPage() {
         <div className="card-top">
           <div>
             <h2>문항 {s.questions.length}개</h2>
-            <p className="muted small-text">후속 질문은 앞 문항의 답을 기억한 채 이어서 답합니다. 번호는 Q1-1, Q1-2처럼 자동으로 붙습니다.</p>
+            <p className="muted small-text">후속 질문은 앞 문항의 응답을 참고하여 이어서 답하는 문항이며, 모든 응답자에게 제시됩니다. 번호는 Q1-1, Q1-2처럼 자동으로 붙습니다.</p>
           </div>
           <div className="row">
             <button className="small" onClick={() => handleAddQ('likert')}>+ 척도형 문항</button>
@@ -125,6 +141,18 @@ export default function SurveyPage() {
           }) : <p className="empty">아직 문항이 없습니다. 위 버튼으로 문항을 추가하세요.</p>}
         </div>
       </section>
+      <Banner
+        tone={flow.tone}
+        actions={<button className="primary" disabled={!flow.ready} onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단 구성하기 →</button>}
+      >
+        <b>{flow.code === 'empty' ? '아직 설문을 시작하지 않았습니다' : flow.ready ? '설문이 실행 가능한 상태입니다.' : '설문에 수정이 필요한 항목이 있습니다.'}</b>
+        <p className="small-text">
+          {flow.code === 'empty' ? '주제와 문항을 입력하면 다음 단계로 진행할 수 있습니다.'
+            : flow.ready ? flow.label + ' · 대상 집단을 구성한 뒤 시뮬레이션에서 버전이 확정됩니다.'
+              : flow.label + ' · 위 오류를 해결하면 다음 단계로 진행할 수 있습니다.'}
+        </p>
+      </Banner>
+      {previewOpen ? <SurveyPreviewModal survey={s} onClose={() => setPreviewOpen(false)} /> : null}
     </>
   )
 }

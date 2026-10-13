@@ -1,11 +1,13 @@
 import PairBars from '../../components/charts/PairBars.jsx'
-import Banner from '../../components/common/Banner.jsx'
+import InfoPopover from '../../components/common/InfoPopover.jsx'
+import { KoreaMapCompare } from '../../components/map/KoreaMap.jsx'
 import { compareRows, gapText, topAttributes } from '../../lib/comparison.js'
 import { CONFIG } from '../../lib/config.js'
 import { distribution, filterPeople } from '../../lib/analysis.js'
 import { ANALYSIS_KEYS, attrLabel } from '../../lib/schema.js'
 import { choices } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { displayAttrValue } from '../../utils/format.js'
 
 const LIMIT = 8
 
@@ -55,6 +57,8 @@ export default function ResponseComparison({ run, q }) {
     </label>
   )
 
+  const smallSample = A.length < CONFIG.MIN_GROUP || B.length < CONFIG.MIN_GROUP
+
   const headContent = (
     <>
       <div className="card-top"><div><h2>선택지별 응답자 비교</h2><p className="muted small-text">두 선택지를 고른 사람들이 어떤 속성에서 다른지 보여 줍니다. 합성 응답 기준입니다.</p></div></div>
@@ -63,6 +67,11 @@ export default function ResponseComparison({ run, q }) {
         <div className="size a"><b>A · {A.length}명</b><span>전체 {total}명 중 {(A.length / total * 100).toFixed(1)}%</span></div>
         <div className="size b"><b>B · {B.length}명</b><span>전체 {total}명 중 {(B.length / total * 100).toFixed(1)}%</span></div>
       </div>
+      {smallSample ? (
+        <InfoPopover label="표본 적음">
+          비교 집단이 {CONFIG.MIN_GROUP}명 미만입니다. 차이는 참고용으로만 보세요. {CONFIG.MIN_CELL}명 미만인 구간은 흐리게 표시하고 순위 계산에서 뺍니다.
+        </InfoPopover>
+      ) : null}
     </>
   )
 
@@ -75,10 +84,6 @@ export default function ResponseComparison({ run, q }) {
     )
   }
 
-  const warn = A.length < CONFIG.MIN_GROUP || B.length < CONFIG.MIN_GROUP
-    ? <Banner tone="warn">비교 집단이 {CONFIG.MIN_GROUP}명 미만입니다. 차이는 참고용으로만 보세요. {CONFIG.MIN_CELL}명 미만인 구간은 흐리게 표시하고 순위 계산에서 뺍니다.</Banner>
-    : null
-
   const tops = topAttributes(A, B)
   const top3 = tops.slice(0, 3)
   const effectiveAttr = effectiveCmp.attr || top3[0]?.key || 'age'
@@ -90,7 +95,7 @@ export default function ResponseComparison({ run, q }) {
         {top3.map((t) => (
           <button key={t.key} className={`top-card ${effectiveAttr === t.key ? 'on' : ''}`} onClick={() => pickAttr(t.key)}>
             <span className="t-head"><b>{attrLabel(t.key)}</b><GapBadge gap={t.gap} /></span>
-            <span className="t-line">{t.value} 비율이 {gapText(t.gap)}</span>
+            <span className="t-line">{displayAttrValue(t.key, t.value)} 비율이 {gapText(t.gap)}</span>
             <span className="t-bars"><span className="lab">A</span><div className="pair"><i className="pa" style={{ width: `${t.pa}%` }} /></div><span className="num">{t.pa.toFixed(1)}%</span></span>
             <span className="t-bars"><span className="lab">B</span><div className="pair"><i className="pb" style={{ width: `${t.pb}%` }} /></div><span className="num">{t.pb.toFixed(1)}%</span></span>
           </button>
@@ -109,6 +114,7 @@ export default function ResponseComparison({ run, q }) {
 
   const chart = (
     <div className="cmp-detail">
+      {effectiveAttr === 'region' ? <KoreaMapCompare rows={rows.map((x) => ({ v: x.value, c: x.ca, bc: x.cb, pa: x.pa, pb: x.pb, gap: x.gap, small: x.small }))} /> : null}
       <div className="cmp-detail-head">
         <label htmlFor="cmp-attr">속성 직접 고르기</label>
         <select id="cmp-attr" value={effectiveAttr} onChange={(ev) => pickAttr(ev.target.value)}>
@@ -119,7 +125,7 @@ export default function ResponseComparison({ run, q }) {
       <div className="cmp-rows">
         {shown.map((x) => (
           <div className={`cmp-row ${x.small ? 'small' : ''}`} key={x.value}>
-            <span className="v">{x.value}</span>
+            <span className="v">{displayAttrValue(effectiveAttr, x.value)}</span>
             <span className="bars"><PairBars aPercent={x.pa} bPercent={x.pb} /></span>
             <span className="n">A {x.pa.toFixed(1)}% <small>({x.ca})</small> · B {x.pb.toFixed(1)}% <small>({x.cb})</small></span>
             <span className="g">{x.small ? <span className="tag">표본 적음</span> : <GapBadge gap={x.gap} />}</span>
@@ -137,7 +143,6 @@ export default function ResponseComparison({ run, q }) {
   return (
     <section className="card cmp">
       {headContent}
-      {warn}
       {cards}
       {chart}
       <p className="muted small-text foot-note">기준: 구간 인원 {CONFIG.MIN_CELL}명 미만은 순위에서 제외 · {CONFIG.HIGHLIGHT_PP}%p 이상 차이는 진하게 표시 · 차이는 두 집단 안의 비율 차이(%p)입니다.</p>

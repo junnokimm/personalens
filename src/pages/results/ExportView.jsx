@@ -12,7 +12,7 @@ export default function ExportView({ project, run }) {
     const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `PersonaScope_실행${run.number}_${format}.csv`
+    a.download = `PersonaLens_실행${run.number}_${format}.csv`
     document.body.appendChild(a)
     a.click()
     a.remove()

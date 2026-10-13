@@ -114,6 +114,7 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .banner.warn { background: var(--warn-soft); border-color: #efd3a5; color: var(--warn); }
 .banner.bad { background: var(--bad-soft); border-color: #f2c2bd; color: var(--bad); }
 .banner.info { background: var(--accent-soft); border-color: #c8d9f1; color: var(--accent-ink); }
+.banner.todo { background: var(--line-2); border-color: var(--line); color: var(--ink); }
 .banner.compact { padding: 8px 10px; font-size: 12px; margin: 10px 0; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 .chip { background: #eef1f5; border-radius: 4px; padding: 2px 7px; font-size: 11px; color: #4c5866; }
@@ -128,6 +129,10 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .project-card b { font-size: 15px; }
 .project-card .meta { font-size: 12px; color: var(--muted); }
 .sum-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.step-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 14px; }
+.step { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 4px; }
+.step-n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--line-2); color: var(--muted); font-size: 11px; font-weight: 700; }
+.step-arrow { color: var(--muted); }
 .sum h2 { font-size: 13px; color: var(--muted); font-weight: 500; }
 .sum .big { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
 .run-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
@@ -164,6 +169,7 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .fm-editor { overflow: auto; padding: 12px 4px 12px 18px; }
 .fm-edit-head { display: flex; justify-content: space-between; align-items: baseline; }
 .fm-edit-head h3 { margin: 0 0 2px; font-size: 16px; }
+.fm-back { display: none; }
 .fm-actions { margin: 8px 0; }
 .fm-options { display: grid; gap: 0; }
 .fm-opt { display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-bottom: 1px solid var(--line-2); font-size: 13px; cursor: pointer; }
@@ -179,6 +185,27 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .levels button.on small { color: #dbe7f7; }
 .range-box { padding: 12px; background: #f6f8fa; border-radius: var(--r); display: grid; gap: 6px; }
 .range-vals { display: flex; justify-content: space-between; font-size: 12px; }
+/* Big5Range의 한 줄 양방향 슬라이더 — 네이티브 input[type=range] 2개를 겹쳐 쌓고
+   트랙은 투명하게, 손잡이만 보이게 해서 라이브러리 없이 구현한다 */
+.dual-range { position: relative; height: 24px; display: flex; align-items: center; }
+.dual-range-track { position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px; background: #d8dee6; }
+.dual-range-fill { position: absolute; height: 4px; border-radius: 2px; background: var(--accent); }
+.dual-range input[type="range"] {
+  position: absolute; left: 0; right: 0; width: 100%; margin: 0; padding: 0; border: 0;
+  background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none;
+}
+.dual-range input[type="range"]::-webkit-slider-runnable-track { background: transparent; height: 4px; }
+.dual-range input[type="range"]::-moz-range-track { background: transparent; height: 4px; border: 0; }
+.dual-range input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; pointer-events: auto; width: 16px; height: 16px; margin-top: -6px;
+  border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent); cursor: pointer;
+}
+.dual-range input[type="range"]::-moz-range-thumb {
+  pointer-events: auto; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent); cursor: pointer;
+}
+.dual-range input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.dual-range input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
 .fm-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 12px; }
 .fm-count { display: grid; gap: 1px; font-size: 13px; }
 .fm-count small { font-size: 11px; color: var(--muted); }
@@ -189,11 +216,11 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .ver { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .ver select { width: 230px; }
 .ver-line { margin: -6px 0 12px; }
-.qlist { display: grid; }
-.q { border-top: 1px solid var(--line); padding: 8px 0; }
+.qlist { display: grid; min-width: 0; }
+.q { min-width: 0; border-top: 1px solid var(--line); padding: 8px 0; }
 .q.child { margin-left: 28px; border-top: 1px dashed var(--line); padding-left: 12px; border-left: 2px solid var(--accent-soft); }
 .follow-note { font-size: 11px; color: var(--accent-ink); margin: 2px 0 0; }
-.q-head { display: flex; align-items: center; gap: 8px; }
+.q-head { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .q-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 6px 2px; text-align: left; }
 .caret { width: 12px; color: var(--muted); }
 .q-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
@@ -202,6 +229,18 @@ tr.click:hover td, tr.click:focus-visible td { background: var(--accent-soft); }
 .q-body { padding: 4px 2px 10px 22px; }
 .opt-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
 .opt-row > .muted { width: 16px; padding-top: 8px; font-size: 12px; }
+.survey-preview { width: min(760px, calc(100vw - 32px)); }
+.preview-survey-head { padding: 10px 0 14px; border-bottom: 1px solid var(--line); }
+.preview-survey-head h1 { margin-bottom: 6px; }
+.preview-questions { display: grid; }
+.preview-question { padding: 16px 0; border-bottom: 1px solid var(--line-2); }
+.preview-question.child { margin-left: 24px; padding-left: 12px; border-left: 2px solid var(--accent-soft); }
+.preview-question-head { display: flex; align-items: center; gap: 7px; }
+.preview-question > p { margin: 8px 0 10px; }
+.preview-options { display: grid; gap: 7px; }
+.preview-option { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.preview-option input { width: auto; }
+.preview-scale-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
 
 /* 대상 집단 */
 .target-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -265,10 +304,19 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .cmp-pick { display: flex; align-items: center; gap: 8px; }
 .cmp-pick > span { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; color: #fff; font-weight: 700; font-size: 12px; }
 .cmp-pick.a > span { background: var(--a); } .cmp-pick.b > span { background: var(--b); }
-.cmp-sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.cmp-sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
 .size { display: grid; padding: 10px 12px; border-radius: var(--r); font-size: 12px; }
 .size b { font-size: 14px; }
 .size.a { background: #edf3fb; } .size.b { background: #fcf1e7; }
+/* 표본 적음 안내 — 노란 배너 대신 작은 정보 아이콘 + 팝오버 */
+.info-pop { position: relative; display: inline-block; margin-bottom: 12px; }
+.info-pop-trigger { padding: 3px 8px; font-size: 11px; color: var(--muted); background: var(--line-2); border-color: transparent; border-radius: 10px; }
+.info-pop-trigger:hover, .info-pop-trigger:focus-visible { color: var(--ink); background: #e5e9ee; }
+.info-pop-bubble {
+  position: absolute; z-index: 3; top: calc(100% + 6px); left: 0; width: 260px;
+  padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: 0 6px 18px rgba(20,29,40,.14); font-size: 12px; color: var(--ink); line-height: 1.5;
+}
 .sub-h { display: flex; gap: 8px; align-items: baseline; }
 .sub-h small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .top3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -312,6 +360,7 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .stack button.on { opacity: 1; outline: 2px solid var(--ink); outline-offset: -2px; }
 .stack button:hover { opacity: .85; }
 .seg-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
+.seg-layout > section { min-width: 0; }
 .seg-stat p { margin: 2px 0; }
 .huge { font-size: 36px; font-weight: 700; line-height: 1.1; }
 .huge small { font-size: 14px; font-weight: 400; margin-left: 4px; }
@@ -333,6 +382,9 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 
 /* 지역 지도 */
 .map-view { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 6px; }
+/* 선택지별 응답자 비교의 지역 지도 — 막대 위에 놓이는 좁은 버전(지도가 세로로 길어 폭을 제한) */
+.cmp-map { max-width: 240px; margin: 0 auto 16px; }
+.cmp-map .map-wrap { position: relative; }
 .map-wrap { position: relative; }
 .map-wrap svg { width: 100%; height: auto; display: block; }
 .map-wrap path { stroke: #fff; stroke-width: .8; transition: fill .2s; }
@@ -421,11 +473,18 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
   #app { padding: 16px; }
   .page-head { flex-direction: column; align-items: flex-start; }
   .grid2, .grid3, .cmp-picks, .cmp-sizes, .people-grid { grid-template-columns: 1fr; }
+  .q-head { flex-wrap: wrap; }
+  .q-toggle { flex-basis: 100%; }
+  .q-actions { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
   .answer { grid-template-columns: 1fr 52px 40px; }
   .answer .a-track { grid-column: 1 / -1; grid-row: 2; }
   .answer .a-go { display: none; }
+  /* 목록과 편집 화면을 동시에 보여주지 않고, FilterModal의 mobileEditorOpen 상태로 한 번에 하나만 보여준다 */
   .fm-body { grid-template-columns: 1fr; }
-  .fm-list { max-height: 160px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .fm-list { max-height: none; border-right: 0; border-bottom: 0; }
+  .fm-body.show-list .fm-editor { display: none; }
+  .fm-body.show-editor .fm-list { display: none; }
+  .fm-back { display: inline-flex; margin-bottom: 8px; }
   .seg-bar { grid-template-columns: 90px 1fr; }
   .seg-bar .n, .seg-bar .gap { grid-column: 2; }
   .map-view { grid-template-columns: 1fr; }

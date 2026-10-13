@@ -2,9 +2,15 @@ node_modules/
 dist/
 .env
 .DS_Store
-legacy/
+
+# Claude 작업 파일 (깃허브에 올리지 않음)
 CLAUDE.md
+CLAUDE_*.md
 PROMPTS.md
+PROMPTS_*.md
+PR.md
+.claude/
+.omo/
 
 # Vite
 dist-ssr/
