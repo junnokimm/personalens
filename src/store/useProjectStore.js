@@ -116,14 +116,33 @@ export const useProjectStore = create(
           q.options.splice(idx, 1); p.survey.draft = true; touchProject(p)
         })
       },
+      /* 새 척도형 문항은 기본값(5점) 대신 바로 앞쪽에서 가장 가까운 척도형 문항의 점수 수·양끝 이름을 이어받는다 */
       addQ(projectId, type) {
         const q = question(type)
         if (type === 'likert') { q.low = '전혀 그렇지 않다'; q.high = '매우 그렇다' }
         set((state) => {
           const p = state.projects.find((x) => x.id === projectId); if (!p) return
+          const prev = type === 'likert' ? p.survey.questions.findLast((x) => x.type === 'likert') : null
+          if (prev) { q.scale = prev.scale; q.low = prev.low; q.high = prev.high }
           p.survey.questions.push(q); p.survey.draft = true; touchProject(p)
         })
         return q.id
+      },
+      /* 구글 설문처럼 문항을 복제 — 질문 내용·응답 형식·척도(점수 수, 양끝 이름)·선택지를 그대로 복사해 바로 뒤에 둔다.
+       * 원래 문항이 후속 질문을 가지고 있으면 후속 질문 묶음 뒤에 둔다(후속 질문은 복제하지 않음) */
+      dupQ(projectId, qid) {
+        let newId = null
+        set((state) => {
+          const p = state.projects.find((x) => x.id === projectId); if (!p) return
+          const s = p.survey, src = s.questions.find((x) => x.id === qid); if (!src) return
+          const copy = { ...clone(src), id: uid('q') }
+          const kids = src.parentId ? [] : s.questions.filter((x) => x.parentId === src.id)
+          const after = kids.length ? kids[kids.length - 1] : src
+          s.questions.splice(s.questions.indexOf(after) + 1, 0, copy)
+          newId = copy.id
+          s.draft = true; touchProject(p)
+        })
+        return newId
       },
       addFollow(projectId, parentId) {
         const q = question('choice', parentId)
@@ -261,6 +280,14 @@ export const useProjectStore = create(
         })
       },
 
+      /* ---------- 응답 모델 ---------- */
+      setModel(projectId, modelId) {
+        set((state) => {
+          const p = state.projects.find((x) => x.id === projectId); if (!p) return
+          p.model = { id: modelId }; touchProject(p)
+        })
+      },
+
       /* ---------- 시뮬레이션 ---------- */
       startRun(projectId, { failNext } = {}) {
         let result
@@ -271,6 +298,7 @@ export const useProjectStore = create(
           let r
           try { r = createRun(p, g) } catch (e) { result = { ok: false, error: e.message }; return }
           r.failAt = failNext ? 60 : null
+          r.model = p.model?.id ?? null
           useUiStore.getState().setFailNext(false)
           p.runs.unshift(r); touchProject(p)
           result = { ok: true, runId: r.id, runNumber: r.number }

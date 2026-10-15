@@ -25,7 +25,7 @@ function tick(projectId, runId) {
     if (!result) { stopTick(); return }
     if (result.status === 'failed') {
       stopTick()
-      useUiStore.getState().showToast(`실행 #${result.number}${josa(result.number, ['이', '가'])} 실패했습니다.`, '실행 기록 보기', { to: `/p/${projectId}/runs` })
+      useUiStore.getState().showToast(`실행 #${result.number}${josa(result.number, ['이', '가'])} 실패했습니다.`, '실행 기록 보기', { to: `/p/${projectId}/results` })
       return
     }
     if (result.status === 'completed') {

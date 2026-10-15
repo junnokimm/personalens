@@ -1,23 +1,29 @@
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { RESULT_SECTIONS, resultSectionOf } from '../../pages/results/resultLinks.js'
 import { useRouteInfo } from './useRouteInfo.js'
 
-/* 원본 pageTitle() */
+/* 원본 pageTitle() — 사이드바 메뉴 구조와 같은 순서·이름 */
 const PAGE_TITLE = {
-  summary: '개요 · 프로젝트 요약',
-  runs: '개요 · 실행 기록',
-  results: '개요 · 결과',
+  summary: '개요',
   survey: '설계 · 설문',
   target: '설계 · 대상 집단',
+  model: '설계 · 응답 모델',
   simulation: '시뮬레이션',
+  runs: '결과 · 실행 기록',
+  results: '결과',
+  interview: '결과',
 }
 
 export default function Topbar() {
-  const { page, projectId } = useRouteInfo()
+  const { page, projectId, runId, resultView } = useRouteInfo()
   const project = useProject(projectId)
   const saveOk = useUiStore((s) => s.saveOk)
 
-  const crumb = project ? `${project.name} / ${PAGE_TITLE[page] || ''}` : '프로젝트'
+  const run = project?.runs.find((r) => r.id === runId)
+  const sectionLabel = RESULT_SECTIONS.find((s) => s.key === resultSectionOf(page, resultView))?.label
+  const title = run ? [PAGE_TITLE[page], `실행 #${run.number}`, sectionLabel].filter(Boolean).join(' · ') : PAGE_TITLE[page] || ''
+  const crumb = project ? `${project.name} / ${title}` : '프로젝트'
 
   return (
     <header className="topbar">

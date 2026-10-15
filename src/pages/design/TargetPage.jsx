@@ -1,13 +1,13 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
-import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
 import FilterChips from '../../components/filters/FilterChips.jsx'
-import { groupError, groupFlowState, groupStale } from '../../lib/cohort.js'
+import { countText, groupError, groupFlowState, groupStale, hasCount } from '../../lib/cohort.js'
 import { CONFIG } from '../../lib/config.js'
 import { attrLabel, estimateCount } from '../../lib/schema.js'
 import { useProject, useProjectStore } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { DesignStepNav, DesignStepper } from './designSteps.jsx'
 import GroupPreview from './GroupPreview.jsx'
 import { useFocusAfterRender } from './useFocusAfterRender.js'
 
@@ -15,7 +15,6 @@ import { useFocusAfterRender } from './useFocusAfterRender.js'
 export default function TargetPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
-  const navigate = useNavigate()
   const selectGroup = useProjectStore((s) => s.selectGroup)
   const renameGroup = useProjectStore((s) => s.renameGroup)
   const dupGroup = useProjectStore((s) => s.dupGroup)
@@ -57,6 +56,11 @@ export default function TargetPage() {
       onApply: (f) => applyTargetFilter(project.id, g.id, f),
     })
   }
+  /* 숫자만 받고, 비우면 null(빈 값), 앞에 붙은 0은 떼어 낸다("05" → 5, "0"은 그대로 두고 범위 오류로 안내) */
+  function handleCountChange(raw) {
+    const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+    setGroupCount(project.id, g.id, digits === '' ? null : Number(digits))
+  }
   function handleBuild() {
     const result = buildCohort(project.id, g.id)
     if (!result.ok) { showToast(result.error); return }
@@ -66,6 +70,7 @@ export default function TargetPage() {
   return (
     <>
       <PageHead title="대상 집단" sub="설문을 받을 합성 페르소나 집단을 조건으로 정의합니다. 여러 집단을 저장해 두고 실행할 때 고를 수 있습니다." />
+      <DesignStepper project={project} current="target" />
       <div className="target-layout">
         <div className="group-list">
           {project.groups.map((x) => {
@@ -73,7 +78,7 @@ export default function TargetPage() {
             return (
               <button key={x.id} className={`group-item ${x.id === g.id ? 'on' : ''}`} onClick={() => selectGroup(project.id, x.id)}>
                 <b>{x.name}</b>
-                <span>{x.count}명 · {itemFlow.ready ? '구성 완료' : <em className="warn-text">{itemFlow.label}</em>}</span>
+                <span>{countText(x)} · {itemFlow.ready ? '구성 완료' : <em className="warn-text">{itemFlow.label}</em>}</span>
                 <small>{Object.keys(x.filters).length ? Object.keys(x.filters).map((k) => attrLabel(k)).slice(0, 3).join(', ') : '조건 없음'} · 실행 {usedBy(x.id)}회</small>
               </button>
             )
@@ -95,31 +100,39 @@ export default function TargetPage() {
             <div className="cond-box">
               <div className="card-top"><h3>대상 조건</h3><button className="small" onClick={handleOpenTargetFilter}>조건 선택</button></div>
               <FilterChips filters={g.filters} onRemove={(key) => removeTargetFilter(project.id, g.id, key)} />
-              <p className={`estimate ${est.estimate < g.count ? 'warn-text' : ''}`}>
+              <p className={`estimate ${hasCount(g) && est.estimate < g.count ? 'warn-text' : ''}`}>
                 조건에 맞는 페르소나 <b>약 {est.estimate.toLocaleString()}명</b> / {est.total.toLocaleString()}명 <span className="muted small-text">(항목끼리 독립이라고 가정한 추정치)</span>
               </p>
             </div>
             <div className="row align-end">
               <div className="field count-field">
                 <label htmlFor="g-count">페르소나 수 ({CONFIG.MIN_PERSONAS}~{CONFIG.MAX_PERSONAS}명)</label>
-                <input id="g-count" type="number" min={CONFIG.MIN_PERSONAS} max={CONFIG.MAX_PERSONAS} value={g.count} className={err ? 'invalid' : ''} onChange={(ev) => setGroupCount(project.id, g.id, Number(ev.target.value))} />
+                <input
+                  id="g-count"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  placeholder={`${CONFIG.MIN_PERSONAS}~${CONFIG.MAX_PERSONAS}`}
+                  value={g.count == null ? '' : String(g.count)}
+                  className={err ? 'invalid' : ''}
+                  aria-invalid={!!err}
+                  aria-describedby={err ? 'g-count-err' : undefined}
+                  onChange={(ev) => handleCountChange(ev.target.value)}
+                />
               </div>
               <button className="primary" disabled={!!err} onClick={handleBuild}>{g.cohort ? '대상 집단 다시 구성' : '대상 집단 구성'}</button>
             </div>
-            {err ? <p className="err-text">{err}</p> : null}
-            {est.estimate < g.count ? <p className="warn-text small-text">조건에 맞는 인원이 구성할 인원보다 적을 수 있습니다. 조건을 줄이거나 인원을 낮추세요.</p> : null}
+            {err ? <p className="err-text" id="g-count-err" role="alert">{err}</p> : null}
+            {hasCount(g) && est.estimate < g.count ? <p className="warn-text small-text">조건에 맞는 인원이 구성할 인원보다 적을 수 있습니다. 조건을 줄이거나 인원을 낮추세요.</p> : null}
             {g.cohort?.textFiltersIgnored?.length ? <p className="muted small-text">서술 조건({g.cohort.textFiltersIgnored.join(', ')})은 시연 데이터에 서술이 없어 구성에 적용되지 않았습니다.</p> : null}
           </section>
           {g.cohort ? <GroupPreview group={g} stale={stale} /> : (
             <section className="card"><h2>미리보기</h2><p className="empty">아직 구성하지 않았습니다. 조건을 고른 뒤 “대상 집단 구성”을 누르세요.</p></section>
           )}
-          <Banner
-            tone={flow.tone}
-            actions={<button className="primary" disabled={!flow.ready} onClick={() => navigate(`/p/${project.id}/simulation`)}>이 집단으로 시뮬레이션 진행하기 →</button>}
-          >
-            <b>{g.name} · {g.count}명</b>
-            <p className="small-text">{flow.label}{flow.ready ? ' · 분포와 프로필을 검토했다면 시뮬레이션으로 진행하세요.' : ' · 현재 설정으로 집단을 구성해야 다음 단계로 진행할 수 있습니다.'}</p>
-          </Banner>
+          <DesignStepNav project={project} current="target">
+            {g.name} · {countText(g)} · {flow.ready ? '분포와 프로필을 검토했다면 응답 모델을 고르세요.' : '현재 설정으로 집단을 구성해야 시뮬레이션을 실행할 수 있습니다.'}
+          </DesignStepNav>
         </div>
       </div>
     </>
