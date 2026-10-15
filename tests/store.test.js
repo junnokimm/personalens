@@ -147,6 +147,23 @@ describe('useProjectStore', () => {
   })
 })
 
+describe('응답 모델 저장', () => {
+  it('고른 모델은 설계 상태에 저장되고 새로고침 뒤에도 남지만, API 키는 저장소에 남지 않는다', async () => {
+    let { useProjectStore } = await import('../src/store/useProjectStore.js')
+    const { useUiStore } = await import('../src/store/useUiStore.js')
+    const projectId = useProjectStore.getState().projects[0].id
+
+    useProjectStore.getState().setModel(projectId, 'gpt')
+    useUiStore.getState().setApiKey(projectId, 'sk-test-secret')
+    expect(useProjectStore.getState().projects[0].model).toEqual({ id: 'gpt' })
+    expect(localStorage.getItem(STORE_KEY)).not.toContain('sk-test-secret')
+
+    vi.resetModules()
+    ;({ useProjectStore } = await import('../src/store/useProjectStore.js'))
+    expect(useProjectStore.getState().projects.find((p) => p.id === projectId).model).toEqual({ id: 'gpt' })
+  })
+})
+
 describe('useUiStore', () => {
   it('openConfirm은 initialFocus를 confirm 상태에 그대로 남긴다', async () => {
     const { useUiStore } = await import('../src/store/useUiStore.js')

@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import * as cohortModule from '../src/lib/cohort.js'
 import { navStatus } from '../src/components/layout/NavStatus.jsx'
+import { RESPONSE_MODELS, modelFlowState } from '../src/lib/models.js'
 import { sample } from '../src/lib/sample.js'
 import * as surveyModule from '../src/lib/survey.js'
 import SurveyPreviewModal from '../src/pages/design/SurveyPreviewModal.jsx'
@@ -54,7 +55,7 @@ describe('설문 단계 연결 UX', () => {
 
     // When: 사용자 흐름 문구를 확인한다
     const hasPreview = source.includes('설문 미리보기')
-    const hasNextStep = source.includes('대상 집단 구성하기 →')
+    const hasNextStep = source.includes('<DesignStepNav project={project} current="survey">')
 
     // Then: 두 동작을 사용자가 발견할 수 있다
     expect(hasPreview).toBe(true)
@@ -107,7 +108,7 @@ describe('대상 집단 단계 연결 UX', () => {
     const source = readFileSync(path.join(__dirname, '../src/pages/design/TargetPage.jsx'), 'utf8')
 
     // When: 다음 단계 문구를 확인한다
-    const hasNextStep = source.includes('이 집단으로 시뮬레이션 진행하기 →')
+    const hasNextStep = source.includes('<DesignStepNav project={project} current="target">')
 
     // Then: 사용자가 직접 다음 단계로 진행할 수 있다
     expect(hasNextStep).toBe(true)
@@ -139,5 +140,34 @@ describe('사이드바 단계 상태', () => {
     // Then: 변경됨과 재구성 필요를 각각 표시한다
     expect(state.survey).toEqual({ c: 'warn', i: '!', t: '변경됨' })
     expect(state.groups).toEqual({ c: 'warn', i: '!', t: '재구성 필요' })
+  })
+})
+
+describe('응답 모델 단계', () => {
+  it('모델을 고르기 전에는 선택 전, 오픈 모델을 고르면 완료로 표시한다', () => {
+    // Given: 모델을 아직 고르지 않은 예시 프로젝트
+    const project = sample()
+
+    // When/Then: 선택 전 → 오픈 모델 선택
+    expect(modelFlowState(project.model, false).code).toBe('empty')
+    expect(navStatus(project).model).toEqual({ c: 'todo', i: '', t: '선택 전' })
+    project.model = { id: 'qwen' }
+    expect(modelFlowState(project.model, false).ready).toBe(true)
+    expect(navStatus(project).model).toEqual({ c: 'ok', i: '✓', t: 'Qwen' })
+  })
+
+  it('API 키가 필요한 모델은 키가 있어야 완료다', () => {
+    // Given: GPT를 고른 프로젝트
+    const model = { id: 'gpt' }
+
+    // Then: 키가 없으면 키 필요, 있으면 완료
+    expect(modelFlowState(model, false).code).toBe('needs-key')
+    expect(modelFlowState(model, true).ready).toBe(true)
+  })
+
+  it('오픈 모델 여러 개와 GPT가 선택지에 있고, 모두 한 줄 설명 자리가 있다', () => {
+    expect(RESPONSE_MODELS.filter((m) => m.open).length).toBeGreaterThanOrEqual(2)
+    expect(RESPONSE_MODELS.some((m) => m.id === 'gpt' && m.needsKey)).toBe(true)
+    expect(RESPONSE_MODELS.every((m) => typeof m.note === 'string' && m.note)).toBe(true)
   })
 })

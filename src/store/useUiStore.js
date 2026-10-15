@@ -36,6 +36,7 @@ export const useUiStore = create(immer((set) => ({
   lastDeleted: null,
   failNext: false,
   saveOk: true,
+  apiKeys: {}, // 프로젝트별 GPT API 키 — 브라우저 저장소에 남기지 않으려고 메모리에만 둔다
   confirm: null, // { title, body, ok, danger, onOk } | null
   toast: null, // { text, actionLabel, action } | null — action: { onClick } | { to } | null
   filterModal: null, // 원본 FM — { mode, title, filters, start, need?, run?, base?, onApply } | null
@@ -63,6 +64,9 @@ export const useUiStore = create(immer((set) => ({
 
   /* ---------- 시뮬레이션 시연 옵션 ---------- */
   setFailNext(value) { set((state) => { state.failNext = value }) },
+
+  /* ---------- 응답 모델 API 키 ---------- */
+  setApiKey(projectId, key) { set((state) => { state.apiKeys[projectId] = key }) },
 
   /* ---------- 저장 상태 ---------- */
   setSaveOk(value) { set((state) => { state.saveOk = value }) },

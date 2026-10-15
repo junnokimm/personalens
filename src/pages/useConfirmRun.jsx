@@ -1,5 +1,6 @@
 import FilterChips from '../components/filters/FilterChips.jsx'
 import { groupError, groupStale } from '../lib/cohort.js'
+import { modelName } from '../lib/models.js'
 import { validateSurvey } from '../lib/survey.js'
 import { startRun } from '../store/useSimulationJob.js'
 import { useUiStore } from '../store/useUiStore.js'
@@ -26,6 +27,7 @@ export function useConfirmRun(project) {
           <dl className="confirm-dl">
             <div><dt>설문</dt><dd>{project.survey.title} · v{project.survey.draft || !project.survey.version ? project.survey.version + 1 : project.survey.version} · 문항 {nQ}개</dd></div>
             <div><dt>대상 집단</dt><dd>{g.name} · {g.count}명<FilterChips filters={g.filters} /></dd></div>
+            <div><dt>응답 모델</dt><dd>{modelName(project.model?.id)}</dd></div>
             <div><dt>예상 응답</dt><dd>{(g.count * nQ).toLocaleString()}개</dd></div>
           </dl>
           <p className="muted small-text">실행 중에도 다른 화면으로 이동할 수 있습니다. 끝나면 알림이 뜹니다.</p>

@@ -454,6 +454,25 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .compose button { white-space: nowrap; }
 .ctx { position: sticky; top: 64px; }
 
+.design-steps { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.ds-step { display: flex; align-items: center; gap: 9px; border: 1px solid transparent; background: none; padding: 6px 10px; border-radius: var(--r); text-align: left; min-width: 0; }
+.ds-step.on { border-color: var(--accent); background: var(--accent-soft); }
+.ds-n { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid #c3ccd6; color: var(--muted); font-size: 12px; font-weight: 700; background: #fff; }
+.ds-step.on .ds-n { border-color: var(--accent); color: var(--accent); }
+.ds-step.done .ds-n { border-color: var(--accent); background: var(--accent); color: #fff; }
+.ds-text { display: grid; line-height: 1.3; min-width: 0; }
+.ds-text b { font-size: 13px; font-weight: 500; }
+.ds-step.on .ds-text b { font-weight: 700; color: var(--accent-ink); }
+.ds-text small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-step.done .ds-text small { color: var(--ok); }
+.ds-line { flex: 1; min-width: 12px; height: 1px; background: var(--line); }
+.model-list { display: grid; gap: 8px; margin-top: 8px; }
+.model-opt { display: grid; grid-template-columns: auto 220px 1fr; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; }
+.model-opt.on { border-color: var(--accent); background: var(--accent-soft); }
+.model-opt input { width: auto; accent-color: var(--accent); }
+.model-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.model-note { font-size: 12px; color: var(--muted); font-style: italic; }
+.api-key { max-width: 420px; }
 .coming-soon { text-align: center; padding: 40px 18px; }
 .coming-soon .big { font-size: 16px; font-weight: 700; margin: 10px 0 6px; }
 
@@ -473,6 +492,10 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
   .nav-children { display: flex; margin: 0; padding-left: 4px; border-left: 1px solid var(--line); }
   .nav-root, .nav-child { width: auto; white-space: nowrap; }
   .nav-child .st, .nav-note, .ctx-label { display: none; }
+  .design-steps { overflow-x: auto; }
+  .ds-text small { display: none; }
+  .model-opt { grid-template-columns: auto 1fr; }
+  .model-note { grid-column: 2; }
   .nav-sub-label { margin: 0 4px; white-space: nowrap; align-self: center; }
   .ctx-name { margin: 4px 0 8px; }
   main { margin-left: 0; }

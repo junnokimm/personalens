@@ -23,6 +23,7 @@ export default function Sidebar() {
   const { page, projectId, runId, resultView } = useRouteInfo()
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
+  const hasKey = useUiStore((s) => !!s.apiKeys[projectId]?.trim())
 
   const section = !project ? ''
     : ['survey', 'target', 'model'].includes(page) ? 'design'
@@ -46,7 +47,7 @@ export default function Sidebar() {
     )
   }
 
-  const st = navStatus(project)
+  const st = navStatus(project, hasKey)
   const running = project.runs.find((r) => r.status === 'running')
   /* 결과 하위 메뉴가 가리킬 실행: 지금 보고 있는 실행, 없으면 가장 최근 완료된 실행 */
   const viewing = project.runs.find((r) => r.id === runId && r.status === 'completed')

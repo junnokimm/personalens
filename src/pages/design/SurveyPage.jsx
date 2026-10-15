@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
 import { surveyFlowState, validateSurvey, versionText } from '../../lib/survey.js'
 import { useProject, useProjectStore } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { DesignStepNav, DesignStepper } from './designSteps.jsx'
 import QuestionBlock from './QuestionBlock.jsx'
 import SurveyPreviewModal from './SurveyPreviewModal.jsx'
 import { useFocusAfterRender } from './useFocusAfterRender.js'
@@ -14,7 +15,6 @@ import { useFocusAfterRender } from './useFocusAfterRender.js'
 export default function SurveyPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
-  const navigate = useNavigate()
   const [previewOpen, setPreviewOpen] = useState(false)
   const editS = useProjectStore((s) => s.editS)
   const addQ = useProjectStore((s) => s.addQ)
@@ -87,6 +87,7 @@ export default function SurveyPage() {
         <button onClick={() => setPreviewOpen(true)}>설문 미리보기</button>
         {verSel}
       </PageHead>
+      <DesignStepper project={project} current="survey" />
       <div className="ver-line">{verNote}</div>
       {flow.code === 'empty' ? (
         <Banner tone="todo">
@@ -141,17 +142,11 @@ export default function SurveyPage() {
           }) : <p className="empty">아직 문항이 없습니다. 위 버튼으로 문항을 추가하세요.</p>}
         </div>
       </section>
-      <Banner
-        tone={flow.tone}
-        actions={<button className="primary" disabled={!flow.ready} onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단 구성하기 →</button>}
-      >
-        <b>{flow.code === 'empty' ? '아직 설문을 시작하지 않았습니다' : flow.ready ? '설문이 실행 가능한 상태입니다.' : '설문에 수정이 필요한 항목이 있습니다.'}</b>
-        <p className="small-text">
-          {flow.code === 'empty' ? '주제와 문항을 입력하면 다음 단계로 진행할 수 있습니다.'
-            : flow.ready ? flow.label + ' · 대상 집단을 구성한 뒤 시뮬레이션에서 버전이 확정됩니다.'
-              : flow.label + ' · 위 오류를 해결하면 다음 단계로 진행할 수 있습니다.'}
-        </p>
-      </Banner>
+      <DesignStepNav project={project} current="survey">
+        {flow.code === 'empty' ? '주제와 문항을 입력하세요.'
+          : flow.ready ? '버전은 시뮬레이션을 실행할 때 확정됩니다.'
+            : '위 오류를 해결해야 시뮬레이션을 실행할 수 있습니다.'}
+      </DesignStepNav>
       {previewOpen ? <SurveyPreviewModal survey={s} onClose={() => setPreviewOpen(false)} /> : null}
     </>
   )

@@ -261,6 +261,14 @@ export const useProjectStore = create(
         })
       },
 
+      /* ---------- 응답 모델 ---------- */
+      setModel(projectId, modelId) {
+        set((state) => {
+          const p = state.projects.find((x) => x.id === projectId); if (!p) return
+          p.model = { id: modelId }; touchProject(p)
+        })
+      },
+
       /* ---------- 시뮬레이션 ---------- */
       startRun(projectId, { failNext } = {}) {
         let result
@@ -271,6 +279,7 @@ export const useProjectStore = create(
           let r
           try { r = createRun(p, g) } catch (e) { result = { ok: false, error: e.message }; return }
           r.failAt = failNext ? 60 : null
+          r.model = p.model?.id ?? null
           useUiStore.getState().setFailNext(false)
           p.runs.unshift(r); touchProject(p)
           result = { ok: true, runId: r.id, runNumber: r.number }

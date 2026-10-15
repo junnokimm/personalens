@@ -6,6 +6,7 @@ import PageHead from '../../components/common/PageHead.jsx'
 import StatusTag from '../../components/common/StatusTag.jsx'
 import FilterChips from '../../components/filters/FilterChips.jsx'
 import { groupFlowState, groupStale } from '../../lib/cohort.js'
+import { modelFlowState } from '../../lib/models.js'
 import { surveyFlowState, validateSurvey, versionText } from '../../lib/survey.js'
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
@@ -16,6 +17,7 @@ import RunRow from './RunRow.jsx'
 /* 1)의 상태 코드에 맞춘 요약 화면용 짧은 문구 — 코드별로 설문·대상 집단에서 한 쌍씩 */
 const SURVEY_STEP_LABEL = { empty: '작성 전', error: '확인 필요', changed: '변경됨', ready: '준비 완료' }
 const GROUP_STEP_LABEL = { invalid: '인원 수 확인 필요', unbuilt: '구성 전', stale: '재구성 필요', built: '구성 완료' }
+const MODEL_STEP_LABEL = { empty: '선택 전', 'needs-key': 'API 키 필요' }
 const TAG_CLASS = { bad: 'bad', warn: 'warn', info: 'info', todo: '' }
 
 /* 원본 summary() — 개요(대시보드). 설계·실행·결과를 한눈에 보고, 준비가 끝났으면 여기서 바로 실행한다 */
@@ -24,6 +26,7 @@ export default function SummaryPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
+  const hasKey = useUiStore((s) => !!s.apiKeys[projectId]?.trim())
   const { canRun, running, confirmRun } = useConfirmRun(project)
 
   const last = project.runs[0]
@@ -35,10 +38,12 @@ export default function SummaryPage() {
   const completedRuns = project.runs.filter((r) => r.status === 'completed').length
   const surveyFlow = surveyFlowState(project.survey, hasRuns)
   const groupFlow = groupFlowState(g)
+  const modelFlow = modelFlowState(project.model, hasKey)
 
   const steps = [
     { key: 'survey', label: '설문', state: SURVEY_STEP_LABEL[surveyFlow.code], tone: surveyFlow.tone, to: `/p/${project.id}/design/survey` },
     { key: 'group', label: '대상 집단', state: GROUP_STEP_LABEL[groupFlow.code], tone: groupFlow.tone, to: `/p/${project.id}/design/target` },
+    { key: 'model', label: '응답 모델', state: MODEL_STEP_LABEL[modelFlow.code] || modelFlow.label.replace(' 선택됨', ''), tone: modelFlow.tone, to: `/p/${project.id}/design/model` },
     { key: 'sim', label: '시뮬레이션', state: hasRuns ? `실행 완료 ${completedRuns}건` : '실행 기록 없음', tone: hasRuns ? 'info' : 'todo', to: `/p/${project.id}/simulation` },
   ]
   const ready = surveyFlow.ready && groupFlow.ready

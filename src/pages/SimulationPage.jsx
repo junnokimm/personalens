@@ -6,6 +6,7 @@ import FilterChips from '../components/filters/FilterChips.jsx'
 import { groupFlowState, groupStale } from '../lib/cohort.js'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
 import { useUiStore } from '../store/useUiStore.js'
+import { modelName } from '../lib/models.js'
 import { josa } from '../utils/format.js'
 import { useConfirmRun } from './useConfirmRun.jsx'
 
@@ -71,6 +72,7 @@ export default function SimulationPage() {
           <div>
             <h2>실행</h2>
             <p className="muted">{g.count}명 × 문항 {nQ}개 = 예상 응답 <b>{(g.count * nQ).toLocaleString()}개</b></p>
+            <p className="muted small-text">응답 모델 <b>{modelName(project.model?.id)}</b> · <button className="link" onClick={() => navigate(`/p/${project.id}/design/model`)}>설계에서 변경</button></p>
           </div>
           <span className={`tag ${running ? 'info' : ready ? 'ok' : 'bad'}`}>{running ? '실행 중' : ready ? '실행 준비 완료' : '설계 확인 필요'}</span>
         </div>
