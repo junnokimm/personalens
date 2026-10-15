@@ -1,4 +1,4 @@
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import PageHead from '../../components/common/PageHead.jsx'
 import { useProject } from '../../store/useProjectStore.js'
@@ -10,24 +10,34 @@ import ExportView from './ExportView.jsx'
 import OverallView from './OverallView.jsx'
 import PersonasView from './PersonasView.jsx'
 import { ResultUrlProvider, useResultUrl } from './ResultUrlContext.jsx'
+import { RESULT_SECTIONS, resultSectionOf, resultSectionUrl } from './resultLinks.js'
 import SegmentView from './SegmentView.jsx'
+
+const SECTION_SUB = {
+  answers: '문항마다 응답 분포를 보고, 선택지별로 어떤 사람들이 답했는지 비교합니다.',
+  segment: '한 응답을 고른 사람들을 속성별로 나눠 보고, 그 집단의 페르소나까지 좁혀 봅니다.',
+}
 
 function CompletedResults({ project, run, done, onSelectRun }) {
   const { view, drill, navigateResult } = useResultUrl()
-  const tabGroup = ['overall', 'segment'].includes(view) ? 'overall' : view === 'export' ? 'export' : 'people'
-  const tabDefs = [['overall', '전체 결과'], ['people', '페르소나'], ['export', '내보내기']]
+  const section = resultSectionOf('results', view)
+  const title = view === 'export' ? '내보내기' : RESULT_SECTIONS.find((s) => s.key === section)?.label || '결과'
 
-  function setView(key) {
-    const nextView = key === 'overall' ? (drill.answer !== null ? 'segment' : 'overall') : key === 'people' ? 'personas' : 'export'
-    navigateResult({ view: nextView, personaId: null, chatQid: null })
+  /* 집단별 분석 안의 두 화면 — 집단 나누기(응답 하나 기준)와 페르소나 목록 */
+  const segTab = view === 'segment' ? 'split' : 'people'
+  function openSegTab(key) {
+    if (key === 'people') navigateResult({ view: 'personas', personaId: null, chatQid: null })
+    else navigateResult({ view: drill.answer !== null ? 'segment' : 'overall', personaId: null, chatQid: null })
   }
 
   return (
     <>
-      <PageHead title="결과" sub="응답 분포에서 시작해 세부 집단과 페르소나까지 좁혀 봅니다." />
+      <PageHead title={title} sub={SECTION_SUB[section] || ''}>
+        {view === 'export' ? null : <button onClick={() => navigateResult({ view: 'export', personaId: null, chatQid: null })}>CSV 내보내기</button>}
+      </PageHead>
       <div className="run-strip">
         <label><span>실행</span>
-          <select aria-label="실행 선택" value={run.id} onChange={(ev) => onSelectRun(ev.target.value)}>
+          <select aria-label="실행 선택" value={run.id} onChange={(ev) => onSelectRun(ev.target.value, section)}>
             {done.map((x) => <option key={x.id} value={x.id}>실행 #{x.number} · {stamp(x.created)}</option>)}
           </select>
         </label>
@@ -35,19 +45,13 @@ function CompletedResults({ project, run, done, onSelectRun }) {
         <div><span>대상 집단</span><b>{run.groupName} · {run.people.length}명</b></div>
         <div><span>상태</span><b>합성 응답 · 미검증</b></div>
       </div>
-      <div className="tabs" role="tablist">
-        {tabDefs.map(([k, l]) => (
-          <button
-            key={k}
-            role="tab"
-            aria-selected={tabGroup === k}
-            className={tabGroup === k ? 'on' : ''}
-            onClick={() => setView(k)}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+      {section === 'segment' ? (
+        <div className="tabs" role="tablist" aria-label="집단별 분석 보기">
+          {[['split', '집단 나누기'], ['people', '페르소나 목록']].map(([k, l]) => (
+            <button key={k} role="tab" aria-selected={segTab === k} className={segTab === k ? 'on' : ''} disabled={k === 'split' && drill.answer === null} onClick={() => openSegTab(k)}>{l}</button>
+          ))}
+        </div>
+      ) : null}
       {view === 'segment' ? <SegmentView run={run} />
         : view === 'personas' ? <PersonasView project={project} run={run} />
         : view === 'export' ? <ExportView project={project} run={run} />
@@ -58,7 +62,7 @@ function CompletedResults({ project, run, done, onSelectRun }) {
   )
 }
 
-/* 원본 results()/openRun() — 실행 정보 띠, 탭 3개, 아래는 view에 따른 화면 */
+/* 원본 results()/openRun() — 실행 하나의 결과. 관점(문항별 답변·집단별 분석)은 사이드바 결과 하위 메뉴에서 고른다 */
 export default function ResultsPage() {
   const { projectId, runId } = useParams()
   const navigate = useNavigate()
@@ -67,20 +71,13 @@ export default function ResultsPage() {
   const run = project.runs.find((item) => item.id === runId)
   const done = project.runs.filter((item) => item.status === 'completed')
 
-  function selectRun(id) {
-    resetResultsUi(project.runs.find((item) => item.id === id))
-    navigate(`/p/${project.id}/results/${id}`)
+  /* 실행을 바꿔도 보던 관점(문항별 답변·집단별 분석)은 유지한다 */
+  function selectRun(id, section) {
+    const next = project.runs.find((item) => item.id === id)
+    resetResultsUi(next)
+    navigate(section ? resultSectionUrl(project.id, next, section) : `/p/${project.id}/results/${id}`)
   }
 
-  if (!runId) {
-    if (done.length) return <Navigate to={`/p/${project.id}/results/${done[0].id}`} replace />
-    return (
-      <>
-        <PageHead title="결과" sub="" />
-        <section className="card empty">완료된 실행이 없습니다. <button className="link" onClick={() => navigate(`/p/${project.id}/simulation`)}>시뮬레이션 실행하기</button></section>
-      </>
-    )
-  }
   if (!run) {
     return (
       <>
@@ -88,7 +85,7 @@ export default function ResultsPage() {
         <section className="card empty">
           이 실행을 찾을 수 없습니다.
           {done.length ? <> <button className="link" onClick={() => selectRun(done[0].id)}>최근 결과 보기</button></> : null}
-          {' '}<button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
+          {' '}<button className="link" onClick={() => navigate(`/p/${project.id}/results`)}>실행 기록 보기</button>
         </section>
       </>
     )
@@ -98,7 +95,7 @@ export default function ResultsPage() {
       <>
         <PageHead title="결과" sub="" />
         <section className="card empty">
-          실행 #{run.number}{josa(run.number, ['은', '는'])} {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 보기</button>
+          실행 #{run.number}{josa(run.number, ['은', '는'])} {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/results`)}>실행 기록 보기</button>
         </section>
       </>
     )

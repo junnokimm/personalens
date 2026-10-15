@@ -7,7 +7,7 @@ import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { stamp } from '../../utils/format.js'
 
-/* 원본 runs() */
+/* 원본 runs() — 결과 › 실행 기록. 같은 프로젝트를 여러 번 실행한 결과를 모아 보고, 하나를 골라 결과로 들어간다 */
 export default function RunsPage() {
   const navigate = useNavigate()
   const { projectId } = useParams()
@@ -21,7 +21,7 @@ export default function RunsPage() {
 
   return (
     <>
-      <PageHead title="실행 기록" sub="이 프로젝트에서 실행한 시뮬레이션입니다. 실행 중에도 다른 화면으로 이동할 수 있습니다.">
+      <PageHead title="실행 기록" sub="이 프로젝트에서 실행한 시뮬레이션을 모아 봅니다. 실행을 하나 고르면 문항별 답변·집단별 분석으로 들어갑니다.">
         <button className="primary" onClick={() => navigate(`/p/${project.id}/simulation`)}>새 시뮬레이션</button>
       </PageHead>
       <section className="card">
@@ -32,7 +32,7 @@ export default function RunsPage() {
             </thead>
             <tbody>
               {project.runs.length ? project.runs.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.status === 'completed' ? 'click' : ''} onClick={r.status === 'completed' ? () => openResult(r.id) : undefined}>
                   <td><b>실행 #{r.number}</b></td>
                   <td>{stamp(r.created)}</td>
                   <td>v{r.survey.version} · {r.survey.questions.length}문항</td>
@@ -43,9 +43,9 @@ export default function RunsPage() {
                   </td>
                   <td className="right">
                     {r.status === 'completed' ? (
-                      <button className="small" onClick={() => openResult(r.id)}>결과 보기</button>
+                      <button className="small" onClick={(ev) => { ev.stopPropagation(); openResult(r.id) }}>결과 보기</button>
                     ) : r.status === 'failed' ? (
-                      <button className="small" onClick={() => retryRun(project.id, r.id)}>다시 시도</button>
+                      <button className="small" onClick={(ev) => { ev.stopPropagation(); retryRun(project.id, r.id) }}>다시 시도</button>
                     ) : (
                       <span className="progress-mini"><i style={{ width: `${r.progress}%` }} /></span>
                     )}

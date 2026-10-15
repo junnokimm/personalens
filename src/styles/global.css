@@ -78,6 +78,9 @@ main { margin-left: var(--root-w); min-height: 100vh; }
 .st.bad { color: var(--bad); } .st.bad b { background: var(--bad); color: #fff; }
 .live { margin-left: auto; font-style: normal; font-size: 11px; color: var(--accent); background: #fff; border: 1px solid var(--accent-soft); border-radius: 10px; padding: 0 6px; font-weight: 400; }
 .live::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; animation: pulse 1.2s infinite; }
+.nav-sub-label { margin: 8px 8px 2px; font-size: 11px; color: var(--muted); }
+.nav-child.sub { padding-left: 14px; }
+.nav-child.sub.on { box-shadow: inset 2px 0 0 var(--accent); }
 .nav-note { font-size: 11px; color: var(--muted); margin: 10px 8px 0; line-height: 1.5; }
 .topbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; gap: 12px; padding: 14px 32px; padding-top: max(14px, env(safe-area-inset-top, 0px)); background: rgba(255,255,255,.94); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 #save-state { color: var(--ok); }
@@ -451,6 +454,9 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .compose button { white-space: nowrap; }
 .ctx { position: sticky; top: 64px; }
 
+.coming-soon { text-align: center; padding: 40px 18px; }
+.coming-soon .big { font-size: 16px; font-weight: 700; margin: 10px 0 6px; }
+
 /* 좁은 화면 */
 @media (max-width: 1100px) {
   .sum-grid, .top3 { grid-template-columns: 1fr; }
@@ -467,6 +473,7 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
   .nav-children { display: flex; margin: 0; padding-left: 4px; border-left: 1px solid var(--line); }
   .nav-root, .nav-child { width: auto; white-space: nowrap; }
   .nav-child .st, .nav-note, .ctx-label { display: none; }
+  .nav-sub-label { margin: 0 4px; white-space: nowrap; align-self: center; }
   .ctx-name { margin: 4px 0 8px; }
   main { margin-left: 0; }
   .topbar { padding: 10px 16px; }

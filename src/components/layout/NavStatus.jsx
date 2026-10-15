@@ -23,7 +23,9 @@ export function navStatus(project) {
       : groupCodes.includes('unbuilt') ? GROUP_NAV_UNBUILT
         : { c: 'ok', i: '✓', t: project.groups.length + '개 구성 완료' }
 
-  return { survey, groups }
+  const model = { c: 'todo', i: '', t: '준비 중' }
+
+  return { survey, groups, model }
 }
 
 export function StatusMark({ x }) {

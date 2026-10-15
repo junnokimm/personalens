@@ -3,13 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Banner from '../components/common/Banner.jsx'
 import PageHead from '../components/common/PageHead.jsx'
 import FilterChips from '../components/filters/FilterChips.jsx'
-import { groupError, groupFlowState, groupStale } from '../lib/cohort.js'
-import { validateSurvey } from '../lib/survey.js'
-import RunRow from './overview/RunRow.jsx'
+import { groupFlowState, groupStale } from '../lib/cohort.js'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
-import { startRun } from '../store/useSimulationJob.js'
 import { useUiStore } from '../store/useUiStore.js'
 import { josa } from '../utils/format.js'
+import { useConfirmRun } from './useConfirmRun.jsx'
 
 /* 원본 sameAsRun() */
 function sameAsRun(project, g) {
@@ -19,25 +17,17 @@ function sameAsRun(project, g) {
     && JSON.stringify(r.groupConfig) === JSON.stringify({ count: g.count, filters: g.filters })) || null
 }
 
-/* 원본 simulation()/confirmRun() */
+/* 원본 simulation() — 실행만 담당한다. 실행 기록은 결과 › 실행 기록에서 본다 */
 export default function SimulationPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
   const navigate = useNavigate()
   const selectGroup = useProjectStore((s) => s.selectGroup)
-  const openConfirm = useUiStore((s) => s.openConfirm)
-  const closeConfirm = useUiStore((s) => s.closeConfirm)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
+  const { group: g, errs, groupErr, stale, running, ready, nQ, confirmRun: handleConfirmRun } = useConfirmRun(project)
 
-  const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
-  const errs = validateSurvey(project.survey).summary
-  const groupErr = groupError(g)
-  const stale = groupStale(g)
-  const ready = !errs.length && !groupErr && !stale
-  const nQ = project.survey.questions.length
   const same = ready ? sameAsRun(project, g) : null
   const last = project.runs.find((r) => r.status === 'completed')
-  const running = project.runs.find((r) => r.status === 'running')
 
   const diffs = last ? [
     project.survey.draft ? `설문: v${last.survey.version} → v${project.survey.version + 1} (변경됨)` : last.survey.version !== project.survey.version ? `설문: v${last.survey.version} → v${project.survey.version}` : '설문: 같음',
@@ -47,27 +37,6 @@ export default function SimulationPage() {
   function openResult(run) {
     resetResultsUi(run)
     navigate(`/p/${project.id}/results/${run.id}`)
-  }
-
-  function handleConfirmRun() {
-    openConfirm({
-      title: '시뮬레이션을 실행할까요?',
-      ok: '실행',
-      body: (
-        <>
-          <dl className="confirm-dl">
-            <div><dt>설문</dt><dd>{project.survey.title} · v{project.survey.draft || !project.survey.version ? project.survey.version + 1 : project.survey.version} · 문항 {nQ}개</dd></div>
-            <div><dt>대상 집단</dt><dd>{g.name} · {g.count}명<FilterChips filters={g.filters} /></dd></div>
-            <div><dt>예상 응답</dt><dd>{(g.count * nQ).toLocaleString()}개</dd></div>
-          </dl>
-          <p className="muted small-text">실행 중에도 다른 화면으로 이동할 수 있습니다. 끝나면 알림이 뜹니다.</p>
-        </>
-      ),
-      onOk: () => {
-        closeConfirm()
-        startRun(project.id)
-      },
-    })
   }
 
   return (
@@ -124,10 +93,9 @@ export default function SimulationPage() {
           <button className="primary" disabled={!ready} onClick={handleConfirmRun}>시뮬레이션 실행</button>
         )}
       </section>
-      <section className="card">
-        <div className="card-top"><h2>최근 실행</h2><button className="small" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 전체</button></div>
-        {project.runs.length ? project.runs.slice(0, 3).map((r) => <RunRow key={r.id} projectId={project.id} run={r} />) : <p className="muted">실행 기록이 없습니다.</p>}
-      </section>
+      <p className="muted small-text">
+        지난 실행은 <button className="link" onClick={() => navigate(`/p/${project.id}/results`)}>결과 › 실행 기록</button>에서 봅니다.
+      </p>
     </>
   )
 }
