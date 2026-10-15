@@ -32,7 +32,7 @@ export const useUiStore = create(immer((set) => ({
   ...otherResultsUi,
 
   /* 저장되지 않는 화면 상태 */
-  openQs: new Set(),
+  selQid: null, // 설문 편집 화면에서 고른 문항(오른쪽 설정 패널에 표시)
   lastDeleted: null,
   failNext: false,
   saveOk: true,
@@ -55,9 +55,8 @@ export const useUiStore = create(immer((set) => ({
     })
   },
 
-  /* ---------- 설문 편집 중 열린 문항 ---------- */
-  toggleOpenQ(id) { set((state) => { state.openQs.has(id) ? state.openQs.delete(id) : state.openQs.add(id) }) },
-  openQ(id) { set((state) => { state.openQs.add(id) }) },
+  /* ---------- 설문 편집 중 고른 문항 ---------- */
+  selectQ(id) { set((state) => { state.selQid = id }) },
 
   /* ---------- 문항 삭제 취소 ---------- */
   setLastDeleted(value) { set((state) => { state.lastDeleted = value }) },
