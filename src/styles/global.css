@@ -409,6 +409,11 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .map-wrap path { stroke: #fff; stroke-width: .8; transition: fill .2s; }
 .map-wrap path[role=button] { cursor: pointer; }
 .map-wrap path.hi, .map-wrap path:focus-visible { stroke: var(--ink); stroke-width: 1.8; outline: none; }
+.m-insets rect { fill: none; stroke: #b7c1cc; stroke-width: .6; stroke-dasharray: 2 1.5; }
+.m-islands .m-marker { fill: none; stroke: var(--ink); stroke-width: .6; opacity: .55; pointer-events: none; }
+.m-islands .m-island-name { font-size: 5.5px; fill: var(--muted); text-anchor: middle; pointer-events: none; }
+.map-wrap .m-hit, .mini-map .m-hit { fill: transparent; stroke: none; }
+.map-wrap .m-hit.can { cursor: pointer; }
 .m-labels text { font-size: 10px; font-weight: 700; fill: var(--ink); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,.85); stroke-width: 3px; }
 .m-labels text.cnt { font-size: 9px; font-weight: 400; }
 .m-p1 { fill: #dbe6f3; background: #dbe6f3; } .m-p2 { fill: #a9c3e2; background: #a9c3e2; } .m-p3 { fill: #4f7cb8; background: #4f7cb8; }
