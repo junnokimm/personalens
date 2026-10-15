@@ -171,3 +171,19 @@ describe('응답 모델 단계', () => {
     expect(RESPONSE_MODELS.every((m) => typeof m.note === 'string' && m.note)).toBe(true)
   })
 })
+
+describe('페르소나 수 입력칸', () => {
+  it('비운 값(null)은 실행할 수 없고 입력을 안내한다', () => {
+    const group = { ...sample().groups[0], count: null }
+    expect(cohortModule.groupError(group)).toMatch(/페르소나 수를 입력하세요/)
+    expect(cohortModule.groupFlowState(group)).toMatchObject({ code: 'invalid', ready: false, label: '페르소나 수 입력 필요' })
+    expect(cohortModule.countText(group)).toBe('인원 미입력')
+  })
+
+  it('입력칸은 숫자 칸(type=number) 대신 텍스트 칸으로 앞자리 0을 떼어 낸다', () => {
+    const source = readFileSync(path.join(__dirname, '../src/pages/design/TargetPage.jsx'), 'utf8')
+    expect(source).toContain('inputMode="numeric"')
+    expect(source).not.toContain('type="number"')
+    expect(source).toContain(".replace(/^0+(?=\\d)/, '')")
+  })
+})

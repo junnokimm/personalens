@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Banner from '../components/common/Banner.jsx'
 import PageHead from '../components/common/PageHead.jsx'
 import FilterChips from '../components/filters/FilterChips.jsx'
-import { groupFlowState, groupStale } from '../lib/cohort.js'
+import { countText, groupFlowState, groupStale } from '../lib/cohort.js'
 import { useProject, useProjectStore } from '../store/useProjectStore.js'
 import { useUiStore } from '../store/useUiStore.js'
 import { modelName } from '../lib/models.js'
@@ -57,7 +57,7 @@ export default function SimulationPage() {
             <select id="sim-group" value={g.id} onChange={(ev) => selectGroup(project.id, ev.target.value)}>
               {project.groups.map((x) => {
                 const xFlow = groupFlowState(x)
-                return <option key={x.id} value={x.id}>{x.name} · {x.count}명{xFlow.ready ? '' : ` (${xFlow.label})`}</option>
+                return <option key={x.id} value={x.id}>{x.name} · {countText(x)}{xFlow.ready ? '' : ` (${xFlow.label})`}</option>
               })}
             </select>
           </div>
@@ -71,7 +71,7 @@ export default function SimulationPage() {
         <div className="card-top">
           <div>
             <h2>실행</h2>
-            <p className="muted">{g.count}명 × 문항 {nQ}개 = 예상 응답 <b>{(g.count * nQ).toLocaleString()}개</b></p>
+            <p className="muted">{countText(g)} × 문항 {nQ}개 = 예상 응답 <b>{((g.count || 0) * nQ).toLocaleString()}개</b></p>
             <p className="muted small-text">응답 모델 <b>{modelName(project.model?.id)}</b> · <button className="link" onClick={() => navigate(`/p/${project.id}/design/model`)}>설계에서 변경</button></p>
           </div>
           <span className={`tag ${running ? 'info' : ready ? 'ok' : 'bad'}`}>{running ? '실행 중' : ready ? '실행 준비 완료' : '설계 확인 필요'}</span>

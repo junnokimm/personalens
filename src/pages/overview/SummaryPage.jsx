@@ -5,7 +5,7 @@ import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
 import StatusTag from '../../components/common/StatusTag.jsx'
 import FilterChips from '../../components/filters/FilterChips.jsx'
-import { groupFlowState, groupStale } from '../../lib/cohort.js'
+import { countText, groupFlowState, groupStale } from '../../lib/cohort.js'
 import { modelFlowState } from '../../lib/models.js'
 import { surveyFlowState, validateSurvey, versionText } from '../../lib/survey.js'
 import { useProject } from '../../store/useProjectStore.js'
@@ -110,7 +110,7 @@ export default function SummaryPage() {
         </section>
         <section className="card sum">
           <h2>대상 집단</h2>
-          <p className="big">{g.name} · {g.count}명</p>
+          <p className="big">{g.name} · {countText(g)}</p>
           <FilterChips filters={g.filters} />
           <p className="muted small-text">저장된 대상 집단 {project.groups.length}개{groupStale(g) ? ' · 이 집단은 다시 구성이 필요합니다' : ''}</p>
           <button className="small" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단 열기</button>
