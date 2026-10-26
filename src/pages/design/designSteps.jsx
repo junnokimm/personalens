@@ -6,15 +6,18 @@ import { groupFlowState } from '../../lib/cohort.js'
 import { modelFlowState } from '../../lib/models.js'
 import { surveyFlowState } from '../../lib/survey.js'
 import { useUiStore } from '../../store/useUiStore.js'
+import { useConnectionStore } from '../../store/useConnectionStore.js'
+import { SERVER_STORAGE } from '../../store/useProjectStore.js'
 
 /* 설계 3단계(설문 → 대상 집단 → 응답 모델)의 순서·경로·완료 여부 — 위쪽 단계 표시와 아래쪽 이전/다음이 같이 쓴다 */
 export function useDesignSteps(project) {
   const hasKey = useUiStore((s) => !!s.apiKeys[project.id]?.trim())
+  const connections = useConnectionStore((s) => s.connections)
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
   return [
     { key: 'survey', label: '설문', path: `/p/${project.id}/design/survey`, flow: surveyFlowState(project.survey, project.runs.length > 0) },
     { key: 'target', label: '대상 집단', path: `/p/${project.id}/design/target`, flow: groupFlowState(g) },
-    { key: 'model', label: '응답 모델', path: `/p/${project.id}/design/model`, flow: modelFlowState(project.model, hasKey) },
+    { key: 'model', label: '응답 모델', path: `/p/${project.id}/design/model`, flow: modelFlowState(project.model, hasKey, SERVER_STORAGE ? connections : undefined) },
   ]
 }
 

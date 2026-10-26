@@ -13,7 +13,13 @@ export const modelName = (id) => responseModel(id)?.name || '미선택'
 
 /* 상태 코드(empty|needs-key|ready) — surveyFlowState·groupFlowState와 같은 방식.
  * API 키는 저장하지 않으므로(메모리에만 둠) 키가 필요한 모델은 hasKey를 따로 받는다 */
-export function modelFlowState(model, hasKey) {
+export function modelFlowState(model, hasKey, connections) {
+  if (model?.connectionId) {
+    const c = connections?.find((item) => item.id === model.connectionId)
+    if (!c?.enabled || !['ready', 'manual'].includes(c.status) || !c.models.some((m) => m.id === model.modelId)) return { code: 'needs-connection', tone: 'warn', label: '연결 확인 필요', ready: false }
+    return { code: 'ready', tone: 'info', label: `${model.modelId} 선택됨`, ready: true }
+  }
+  if (connections) return { code: 'empty', tone: 'todo', label: '모델 선택 전', ready: false }
   const m = responseModel(model?.id)
   if (!m) return { code: 'empty', tone: 'todo', label: '모델 선택 전', ready: false }
   if (m.needsKey && !hasKey) return { code: 'needs-key', tone: 'warn', label: `${m.name} · API 키 입력 필요`, ready: false }

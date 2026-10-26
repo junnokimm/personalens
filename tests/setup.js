@@ -1,3 +1,5 @@
+import { vi } from 'vitest'
+
 /* vitest 기본 환경(node)에는 localStorage가 없어 persist 미들웨어가 쓸 간단한 메모리 구현을 둔다.
  * 새 라이브러리를 추가하지 않기 위해 jsdom 대신 최소 구현만 둔다. */
 class MemoryStorage {
@@ -11,3 +13,6 @@ class MemoryStorage {
 if (typeof globalThis.localStorage?.setItem !== 'function') {
   globalThis.localStorage = new MemoryStorage()
 }
+// Legacy parity tests explicitly exercise the standalone demo mode.
+// Server persistence has its own tests and is the app's default mode.
+vi.stubEnv('VITE_STORAGE_MODE', 'local')

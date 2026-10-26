@@ -2,10 +2,12 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { RESULT_SECTIONS, resultSectionOf, resultSectionUrl } from '../../pages/results/resultLinks.js'
-import { useProject } from '../../store/useProjectStore.js'
+import { SERVER_STORAGE, useProject } from '../../store/useProjectStore.js'
+import { useConnectionStore } from '../../store/useConnectionStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { navStatus, StatusMark } from './NavStatus.jsx'
 import { useRouteInfo } from './useRouteInfo.js'
+import { hasRunResults, isRunActive } from '../../lib/runStatus.js'
 
 function NavChild({ on, label, onClick, meta, className = '', disabled }) {
   return (
@@ -24,6 +26,7 @@ export default function Sidebar() {
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
   const hasKey = useUiStore((s) => !!s.apiKeys[projectId]?.trim())
+  const connections = useConnectionStore((s) => s.connections)
 
   const section = !project ? ''
     : ['survey', 'target', 'model'].includes(page) ? 'design'
@@ -47,11 +50,11 @@ export default function Sidebar() {
     )
   }
 
-  const st = navStatus(project, hasKey)
-  const running = project.runs.find((r) => r.status === 'running')
+  const st = navStatus(project, hasKey, SERVER_STORAGE ? connections : undefined)
+  const running = project.runs.find(isRunActive)
   /* 결과 하위 메뉴가 가리킬 실행: 지금 보고 있는 실행, 없으면 가장 최근 완료된 실행 */
-  const viewing = project.runs.find((r) => r.id === runId && r.status === 'completed')
-  const resultRun = viewing || project.runs.find((r) => r.status === 'completed')
+  const viewing = project.runs.find((r) => r.id === runId && hasRunResults(r))
+  const resultRun = viewing || project.runs.find(hasRunResults)
   const resultSection = resultSectionOf(page, resultView)
 
   function openResultSection(key) {

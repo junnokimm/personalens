@@ -8,7 +8,15 @@ const SCHEMA = () => PERSONA_SCHEMA
 /* ---------- 대상 집단 (여러 개 저장) ---------- */
 export function group(name = '새 대상 집단') { return { id: uid('group'), name, count: 100, filters: {}, cohort: null } }
 export const groupKey = (g) => JSON.stringify({ count: g.count, filters: g.filters })
-export const groupStale = (g) => !g.cohort || g.cohort.builtFrom !== groupKey(g)
+export const groupStale = (g) => {
+  if (!g.cohort) return true
+  // PostgreSQL JSONB may reorder object keys. That alone must not invalidate a built group.
+  try {
+    const built = JSON.parse(g.cohort.builtFrom)
+    const sort = (filters) => Object.entries(filters).sort(([a], [b]) => a.localeCompare(b))
+    return built.count !== g.count || JSON.stringify(sort(built.filters)) !== JSON.stringify(sort(g.filters))
+  } catch { return true }
+}
 /* 페르소나 수 입력칸은 비울 수 있다(count: null). 비어 있으면 구성·실행을 막고 입력을 안내한다 */
 export const hasCount = (g) => Number.isInteger(g.count)
 export const countText = (g) => (hasCount(g) ? `${g.count}명` : '인원 미입력')

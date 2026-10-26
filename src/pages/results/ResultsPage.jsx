@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import PageHead from '../../components/common/PageHead.jsx'
-import { useProject } from '../../store/useProjectStore.js'
+import { SERVER_STORAGE, useProject, useProjectStore } from '../../store/useProjectStore.js'
+import { hasRunResults, isRunActive } from '../../lib/runStatus.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { josa, stamp } from '../../utils/format.js'
 import ChatView from './ChatView.jsx'
@@ -45,6 +47,10 @@ function CompletedResults({ project, run, done, onSelectRun }) {
         <div><span>대상 집단</span><b>{run.groupName} · {run.people.length}명</b></div>
         <div><span>상태</span><b>합성 응답 · 미검증</b></div>
       </div>
+      <div className={`banner ${run.status === 'completed' ? 'info' : 'warn'}`}>
+        <span>{run._server ? '서버 시연 응답 · 실제 모델 미연결 · 실행 시점의 설계 기준' : '이전 로컬 시연 응답 · 이 브라우저에만 저장됨'}
+          {run.status !== 'completed' ? ` · ${run.people.length * run.survey.questions.length}개 중 ${run.responses.length}개 응답만 표시합니다. 미응답을 해석에 유의하세요.` : ''}</span>
+      </div>
       {section === 'segment' ? (
         <div className="tabs" role="tablist" aria-label="집단별 분석 보기">
           {[['split', '집단 나누기'], ['people', '페르소나 목록']].map(([k, l]) => (
@@ -68,8 +74,15 @@ export default function ResultsPage() {
   const navigate = useNavigate()
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
+  const runsLoaded = useProjectStore((s) => s.runsLoaded)
+  const runsError = useProjectStore((s) => s.runsError)
+  const loadResult = useProjectStore((s) => s.loadRunResult)
+  const resultError = useProjectStore((s) => s.resultErrors?.[runId])
   const run = project.runs.find((item) => item.id === runId)
-  const done = project.runs.filter((item) => item.status === 'completed')
+  const done = project.runs.filter(hasRunResults)
+  useEffect(() => {
+    if (run?._server && hasRunResults(run) && !run._loaded) void loadResult(projectId, runId)
+  }, [projectId, runId, run?._server, run?._loaded, run?.updated, loadResult])
 
   /* 실행을 바꿔도 보던 관점(문항별 답변·집단별 분석)은 유지한다 */
   function selectRun(id, section) {
@@ -78,6 +91,7 @@ export default function ResultsPage() {
     navigate(section ? resultSectionUrl(project.id, next, section) : `/p/${project.id}/results/${id}`)
   }
 
+  if (SERVER_STORAGE && (!runsLoaded || runsError)) return <section className="card" role="status">{runsError || '실행 기록을 불러오는 중입니다…'}</section>
   if (!run) {
     return (
       <>
@@ -90,16 +104,21 @@ export default function ResultsPage() {
       </>
     )
   }
-  if (run.status !== 'completed') {
+  if (!hasRunResults(run)) {
     return (
       <>
         <PageHead title="결과" sub="" />
         <section className="card empty">
-          실행 #{run.number}{josa(run.number, ['은', '는'])} {run.status === 'running' ? `진행 중입니다 (${run.progress}%).` : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/results`)}>실행 기록 보기</button>
+          실행 #{run.number}{josa(run.number, ['은', '는'])} {isRunActive(run) ? `${run.status === 'queued' ? '워커 처리 대기 중' : '진행 중'}입니다 (${run.progress}%).` : run.status === 'cancelled' ? '취소되었습니다.' : '실패했습니다.'} <button className="link" onClick={() => navigate(`/p/${project.id}/results`)}>실행 기록 보기</button>
         </section>
       </>
     )
   }
+
+  if (run._server && !run._loaded) return <section className="card" role="status">
+    {resultError || 'DB에서 응답과 페르소나를 불러오는 중입니다…'}
+    {resultError ? <button onClick={() => loadResult(projectId, runId)}>다시 불러오기</button> : null}
+  </section>
 
   return (
     <ResultUrlProvider run={run}>

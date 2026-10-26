@@ -2,6 +2,10 @@ node_modules/
 dist/
 .env
 .DS_Store
+.venv/
+__pycache__/
+.pytest_cache/
+.runtime/
 
 # Claude 작업 파일 (깃허브에 올리지 않음)
 CLAUDE.md

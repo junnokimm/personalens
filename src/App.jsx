@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
 
 import ConfirmModal from './components/common/ConfirmModal.jsx'
 import Toast from './components/common/Toast.jsx'
+import PersistenceNotice from './components/common/PersistenceNotice.jsx'
 import FilterModal from './components/filters/FilterModal.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import Topbar from './components/layout/Topbar.jsx'
@@ -14,20 +16,33 @@ import TargetPage from './pages/design/TargetPage.jsx'
 import SimulationPage from './pages/SimulationPage.jsx'
 import InterviewPage from './pages/results/InterviewPage.jsx'
 import ResultsPage from './pages/results/ResultsPage.jsx'
-import { useProject } from './store/useProjectStore.js'
+import { useProject, useProjectStore } from './store/useProjectStore.js'
 import { useSimulationJob } from './store/useSimulationJob.js'
 import { useUiStore } from './store/useUiStore.js'
+import AuthGate from './components/common/AuthGate.jsx'
+import ConnectionsPage from './pages/ConnectionsPage.jsx'
+import { useConnectionStore } from './store/useConnectionStore.js'
+import { SERVER_STORAGE } from './store/useProjectStore.js'
 
 /* 원본 index.html의 바깥 틀(aside + main + overlay + toast) */
 function RootShell() {
   useSimulationJob()
   const filterModal = useUiStore((s) => s.filterModal)
+  const dataStatus = useProjectStore((s) => s.dataStatus)
+  const loadError = useProjectStore((s) => s.loadError)
+  const loadProjects = useProjectStore((s) => s.loadProjects)
+  useEffect(() => { void loadProjects() }, [loadProjects])
+  useEffect(() => { if (SERVER_STORAGE) void useConnectionStore.getState().load() }, [])
   return (
     <>
       <Sidebar />
       <main>
         <Topbar />
-        <div id="app"><Outlet /></div>
+        <div id="app">
+          {dataStatus === 'loading' ? <section className="card" role="status">프로젝트를 불러오는 중입니다…</section>
+            : dataStatus === 'error' ? <section className="card" role="alert"><h2>프로젝트를 불러오지 못했습니다</h2><p>{loadError}</p><button onClick={loadProjects}>다시 불러오기</button></section>
+              : <><PersistenceNotice /><Outlet /></>}
+        </div>
       </main>
       <div id="overlay">{filterModal ? <FilterModal key={filterModal} opts={filterModal} /> : <ConfirmModal />}</div>
       <Toast />
@@ -53,8 +68,9 @@ function RunsRedirect() {
 function App() {
   return (
     <Routes>
-      <Route element={<RootShell />}>
+      <Route element={<AuthGate><RootShell /></AuthGate>}>
         <Route index element={<ProjectsPage />} />
+        <Route path="settings/connections" element={<ConnectionsPage />} />
         <Route path="p/:projectId" element={<ProjectGate />}>
           <Route index element={<SummaryPage />} />
           <Route path="design/survey" element={<SurveyPage />} />
