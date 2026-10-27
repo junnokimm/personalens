@@ -147,6 +147,73 @@ describe('useProjectStore', () => {
   })
 })
 
+describe('문항 복제·척도 이어받기', () => {
+  it('복제하면 응답 형식·점수 수·양끝 이름·선택지가 그대로 복사되고 바로 뒤에 온다', async () => {
+    const { useProjectStore } = await import('../src/store/useProjectStore.js')
+    const projectId = useProjectStore.getState().projects[0].id
+    const qid = useProjectStore.getState().addQ(projectId, 'likert')
+    useProjectStore.getState().editQ(projectId, qid, 'scale', 7)
+    useProjectStore.getState().editQ(projectId, qid, 'low', '전혀 아니다')
+    useProjectStore.getState().editQ(projectId, qid, 'high', '매우 그렇다!')
+    useProjectStore.getState().editQ(projectId, qid, 'text', '원래 질문')
+
+    const copyId = useProjectStore.getState().dupQ(projectId, qid)
+    const qs = useProjectStore.getState().projects[0].survey.questions
+    const src = qs.find((q) => q.id === qid), copy = qs.find((q) => q.id === copyId)
+    expect(copyId).not.toBe(qid)
+    expect(qs.indexOf(copy)).toBe(qs.indexOf(src) + 1)
+    expect({ ...copy, id: null }).toEqual({ ...src, id: null })
+  })
+
+  it('후속 질문이 있는 문항을 복제하면 후속 질문 묶음 뒤에 독립 문항으로 온다', async () => {
+    const { useProjectStore } = await import('../src/store/useProjectStore.js')
+    const { ordered } = await import('../src/lib/survey.js')
+    const projectId = useProjectStore.getState().projects[0].id
+    const s0 = useProjectStore.getState().projects[0].survey
+    const parent = s0.questions.find((q) => s0.questions.some((c) => c.parentId === q.id))
+    const kids = s0.questions.filter((q) => q.parentId === parent.id).length
+
+    const copyId = useProjectStore.getState().dupQ(projectId, parent.id)
+    const s = useProjectStore.getState().projects[0].survey
+    const list = ordered(s)
+    expect(list.findIndex((q) => q.id === copyId)).toBe(list.findIndex((q) => q.id === parent.id) + kids + 1)
+    expect(s.questions.filter((q) => q.parentId === copyId)).toHaveLength(0)
+    expect(s.questions.find((q) => q.id === copyId).parentId).toBeNull()
+  })
+
+  it('새 척도형 문항은 가장 가까운 앞 척도형 문항의 점수 수·양끝 이름을 이어받는다', async () => {
+    const { useProjectStore } = await import('../src/store/useProjectStore.js')
+    const projectId = useProjectStore.getState().projects[0].id
+    const first = useProjectStore.getState().addQ(projectId, 'likert')
+    useProjectStore.getState().editQ(projectId, first, 'scale', 7)
+    useProjectStore.getState().editQ(projectId, first, 'low', '매우 불만족')
+    useProjectStore.getState().editQ(projectId, first, 'high', '매우 만족')
+    useProjectStore.getState().addQ(projectId, 'choice')
+
+    const next = useProjectStore.getState().addQ(projectId, 'likert')
+    const q = useProjectStore.getState().projects[0].survey.questions.find((x) => x.id === next)
+    expect([q.scale, q.low, q.high]).toEqual([7, '매우 불만족', '매우 만족'])
+    expect(q.text).toBe('')
+  })
+})
+
+describe('응답 모델 저장', () => {
+  it('고른 모델은 설계 상태에 저장되고 새로고침 뒤에도 남지만, API 키는 저장소에 남지 않는다', async () => {
+    let { useProjectStore } = await import('../src/store/useProjectStore.js')
+    const { useUiStore } = await import('../src/store/useUiStore.js')
+    const projectId = useProjectStore.getState().projects[0].id
+
+    useProjectStore.getState().setModel(projectId, 'gpt')
+    useUiStore.getState().setApiKey(projectId, 'sk-test-secret')
+    expect(useProjectStore.getState().projects[0].model).toEqual({ id: 'gpt' })
+    expect(localStorage.getItem(STORE_KEY)).not.toContain('sk-test-secret')
+
+    vi.resetModules()
+    ;({ useProjectStore } = await import('../src/store/useProjectStore.js'))
+    expect(useProjectStore.getState().projects.find((p) => p.id === projectId).model).toEqual({ id: 'gpt' })
+  })
+})
+
 describe('useUiStore', () => {
   it('openConfirm은 initialFocus를 confirm 상태에 그대로 남긴다', async () => {
     const { useUiStore } = await import('../src/store/useUiStore.js')

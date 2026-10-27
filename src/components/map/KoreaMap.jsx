@@ -1,25 +1,56 @@
 import { Fragment, useRef, useState } from 'react'
 
-import koreaMap from '../../data/koreaMap.json'
 import { CONFIG } from '../../lib/config.js'
+import { KOREA_MAP as koreaMap } from '../../lib/koreaMap.js'
 import SegGap from '../charts/SegGap.jsx'
 import { displayRegion, pct } from '../../utils/format.js'
 
 const SHORT = { '충청북도': '충북', '충청남도': '충남', '전라남도': '전남', '경상북도': '경북', '경상남도': '경남' }
 const FULL_LABELS = ['강원', '경기', '충청북도', '충청남도', '전북', '전라남도', '경상북도', '경상남도', '제주']
 
+/* 본토 밖 섬(울릉도·독도, 백령도·연평도)을 옮겨 그린 인셋의 점선 상자 — 지역 경로보다 먼저(아래에) 그린다 */
+function InsetFrames() {
+  return (
+    <g className="m-insets" aria-hidden="true">
+      {koreaMap.insets.map((b) => <rect key={b.id} x={b.x} y={b.y} width={b.w} height={b.h} rx="2" />)}
+    </g>
+  )
+}
+
+/* 작은 섬 위에 겹치는 층 — 위치 고리·이름, 그리고 클릭·마우스를 받는 투명 원.
+ * 섬 모양 자체는 상위 시·도 경로에 합쳐져 있어 색·강조가 같이 바뀌고, 이 원은 너무 작은 섬을 눌러도
+ * 상위 시·도가 선택되도록 같은 이벤트를 넘겨 준다(hitProps(상위 지역 이름)) */
+function IslandOverlay({ hitProps, hitTitle }) {
+  return (
+    <g className="m-islands">
+      {koreaMap.islands.map((i) => (
+        <Fragment key={i.name}>
+          {i.marker ? <circle className="m-marker" cx={i.at[0]} cy={i.at[1]} r={i.marker} aria-hidden="true" /> : null}
+          <text className="m-island-name" x={i.label[0]} y={i.label[1]} aria-hidden="true">{i.name}</text>
+          <circle className="m-hit" cx={i.at[0]} cy={i.at[1]} r={i.hitR} data-parent={i.parent} aria-hidden="true" {...(hitProps ? hitProps(i.parent) : {})}>
+            {hitTitle ? <title>{hitTitle(i)}</title> : null}
+          </circle>
+        </Fragment>
+      ))}
+    </g>
+  )
+}
+
 /* 원본 miniMap() — 대상 집단 분포 미리보기용 축소판 지도 */
 export default function KoreaMap({ rows }) {
   const by = Object.fromEntries(rows.map((r) => [r.value, r]))
   const cls = (r) => (!r ? 'm-empty' : 'm-s' + (r.percent < 5 ? 1 : r.percent < 10 ? 2 : r.percent < 20 ? 3 : 4))
+  const tip = (n) => `${displayRegion(n)} ${by[n] ? `${by[n].count}명 · ${pct(by[n].percent)}` : '0명'}`
   return (
     <div className="mini-map">
       <svg viewBox={`0 0 ${koreaMap.w} ${koreaMap.h}`} role="img" aria-label="시·도별 인원 지도">
+        <InsetFrames />
         {Object.entries(koreaMap.regions).map(([n, g]) => (
           <path key={n} d={g.d} className={cls(by[n])}>
-            <title>{displayRegion(n)} {by[n] ? `${by[n].count}명 · ${pct(by[n].percent)}` : '0명'}</title>
+            <title>{tip(n)}</title>
           </path>
         ))}
+        <IslandOverlay hitTitle={(i) => `${i.name} · ${tip(i.parent)}`} />
       </svg>
       <div className="m-legend">
         <span>적음</span>
@@ -79,6 +110,7 @@ export function KoreaMapCompare({ rows }) {
     <div className="cmp-map">
       <div className="map-wrap" ref={wrapRef}>
         <svg viewBox={`0 0 ${koreaMap.w} ${koreaMap.h}`} role="img" aria-label="지역별 A·B 비교 지도">
+          <InsetFrames />
           {Object.entries(koreaMap.regions).map(([name, g]) => {
             const rx = MAPROWS[name]
             const has = rx && (rx.c || rx.bc)
@@ -103,6 +135,10 @@ export function KoreaMapCompare({ rows }) {
               return <text key={n} x={g.c[0]} y={g.c[1]}>{SHORT[n] || n}</text>
             })}
           </g>
+          <IslandOverlay hitProps={(name) => ({
+            onMouseMove: (ev) => showTipAtPointer(name, ev.clientX, ev.clientY),
+            onMouseLeave: hideTip,
+          })} />
         </svg>
         <div className="map-tip" hidden={!hover} style={tipPos ? { left: tipPos.left, top: tipPos.top } : undefined}>
           {hover ? (
@@ -168,6 +204,7 @@ export function KoreaMapFull({ rows, mapColor, onColorChange, onNarrow }) {
     <div className="map-view">
       <div className="map-wrap" ref={wrapRef}>
         <svg viewBox={`0 0 ${koreaMap.w} ${koreaMap.h}`} role="group" aria-label="시·도별 지도">
+          <InsetFrames />
           {Object.entries(koreaMap.regions).map(([name, g]) => {
             const rx = MAPROWS[name], can = rx && rx.c > 0
             return (
@@ -199,6 +236,15 @@ export function KoreaMapFull({ rows, mapColor, onColorChange, onNarrow }) {
               )
             })}
           </g>
+          <IslandOverlay hitProps={(name) => {
+            const can = MAPROWS[name]?.c > 0
+            return {
+              className: `m-hit ${can ? 'can' : ''}`,
+              onClick: can ? () => onNarrow(name) : undefined,
+              onMouseMove: (ev) => showTipAtPointer(name, ev.clientX, ev.clientY),
+              onMouseLeave: hideTip,
+            }
+          }} />
         </svg>
         <div id="map-tip" className="map-tip" hidden={!hover} style={tipPos ? { left: tipPos.left, top: tipPos.top } : undefined}>
           {hover ? (

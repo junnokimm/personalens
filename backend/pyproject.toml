@@ -1,0 +1,21 @@
+[project]
+name = "persona-lens-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.161.1",
+  "uvicorn==0.54.0",
+  "sqlalchemy==2.1.6",
+  "psycopg[binary]==3.3.6",
+  "alembic==1.20.1",
+  "pydantic==2.14.1",
+  "pydantic-settings==2.16.1",
+  "cryptography>=44,<48",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "httpx2==2.16.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

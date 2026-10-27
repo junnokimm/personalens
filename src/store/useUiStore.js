@@ -32,10 +32,11 @@ export const useUiStore = create(immer((set) => ({
   ...otherResultsUi,
 
   /* 저장되지 않는 화면 상태 */
-  openQs: new Set(),
+  selQid: null, // 설문 편집 화면에서 고른 문항(오른쪽 설정 패널에 표시)
   lastDeleted: null,
   failNext: false,
   saveOk: true,
+  apiKeys: {}, // 프로젝트별 GPT API 키 — 브라우저 저장소에 남기지 않으려고 메모리에만 둔다
   confirm: null, // { title, body, ok, danger, onOk } | null
   toast: null, // { text, actionLabel, action } | null — action: { onClick } | { to } | null
   filterModal: null, // 원본 FM — { mode, title, filters, start, need?, run?, base?, onApply } | null
@@ -54,15 +55,17 @@ export const useUiStore = create(immer((set) => ({
     })
   },
 
-  /* ---------- 설문 편집 중 열린 문항 ---------- */
-  toggleOpenQ(id) { set((state) => { state.openQs.has(id) ? state.openQs.delete(id) : state.openQs.add(id) }) },
-  openQ(id) { set((state) => { state.openQs.add(id) }) },
+  /* ---------- 설문 편집 중 고른 문항 ---------- */
+  selectQ(id) { set((state) => { state.selQid = id }) },
 
   /* ---------- 문항 삭제 취소 ---------- */
   setLastDeleted(value) { set((state) => { state.lastDeleted = value }) },
 
   /* ---------- 시뮬레이션 시연 옵션 ---------- */
   setFailNext(value) { set((state) => { state.failNext = value }) },
+
+  /* ---------- 응답 모델 API 키 ---------- */
+  setApiKey(projectId, key) { set((state) => { state.apiKeys[projectId] = key }) },
 
   /* ---------- 저장 상태 ---------- */
   setSaveOk(value) { set((state) => { state.saveOk = value }) },

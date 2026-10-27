@@ -4,6 +4,7 @@ import StatusTag from '../../components/common/StatusTag.jsx'
 import { retryRun } from '../../store/useSimulationJob.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { stamp } from '../../utils/format.js'
+import { canRetryRun, hasRunResults, runPeopleCount } from '../../lib/runStatus.js'
 
 /* 원본 runRow() — SummaryPage·RunsPage가 공유 */
 export default function RunRow({ projectId, run }) {
@@ -20,12 +21,12 @@ export default function RunRow({ projectId, run }) {
       <div>
         <b>실행 #{run.number}</b> <StatusTag run={run} />
         <p className="muted small-text">
-          {stamp(run.created)} · 설문 v{run.survey.version} · {run.groupName} {run.people.length}명{run.failNote ? ' · ' + run.failNote : ''}
+          {stamp(run.created)} · 설문 v{run.survey.version} · {run.groupName} {runPeopleCount(run)}명{run.failNote ? ' · ' + run.failNote : ''}
         </p>
       </div>
-      {run.status === 'completed' ? (
+      {hasRunResults(run) ? (
         <button className="small" onClick={openResult}>결과 보기</button>
-      ) : run.status === 'failed' ? (
+      ) : canRetryRun(run) ? (
         <button className="small" onClick={() => retryRun(projectId, run.id)}>다시 시도</button>
       ) : (
         <span className="progress-mini"><i style={{ width: `${run.progress}%` }} /></span>

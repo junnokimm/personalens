@@ -5,24 +5,32 @@ import Banner from '../../components/common/Banner.jsx'
 import PageHead from '../../components/common/PageHead.jsx'
 import StatusTag from '../../components/common/StatusTag.jsx'
 import FilterChips from '../../components/filters/FilterChips.jsx'
-import { groupFlowState, groupStale } from '../../lib/cohort.js'
+import { countText, groupFlowState, groupStale } from '../../lib/cohort.js'
+import { modelFlowState } from '../../lib/models.js'
+import { useConnectionStore } from '../../store/useConnectionStore.js'
+import { SERVER_STORAGE } from '../../store/useProjectStore.js'
 import { surveyFlowState, validateSurvey, versionText } from '../../lib/survey.js'
 import { useProject } from '../../store/useProjectStore.js'
 import { useUiStore } from '../../store/useUiStore.js'
 import { stamp } from '../../utils/format.js'
+import { useConfirmRun } from '../useConfirmRun.jsx'
 import RunRow from './RunRow.jsx'
+import { hasRunResults, runPeopleCount } from '../../lib/runStatus.js'
 
 /* 1)의 상태 코드에 맞춘 요약 화면용 짧은 문구 — 코드별로 설문·대상 집단에서 한 쌍씩 */
 const SURVEY_STEP_LABEL = { empty: '작성 전', error: '확인 필요', changed: '변경됨', ready: '준비 완료' }
 const GROUP_STEP_LABEL = { invalid: '인원 수 확인 필요', unbuilt: '구성 전', stale: '재구성 필요', built: '구성 완료' }
+const MODEL_STEP_LABEL = { empty: '선택 전', 'needs-key': 'API 키 필요' }
 const TAG_CLASS = { bad: 'bad', warn: 'warn', info: 'info', todo: '' }
 
-/* 원본 summary() */
+/* 원본 summary() — 개요(대시보드). 설계·실행·결과를 한눈에 보고, 준비가 끝났으면 여기서 바로 실행한다 */
 export default function SummaryPage() {
   const navigate = useNavigate()
   const { projectId } = useParams()
   const project = useProject(projectId)
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
+  const hasKey = useUiStore((s) => !!s.apiKeys[projectId]?.trim())
+  const { canRun, running, confirmRun } = useConfirmRun(project)
 
   const last = project.runs[0]
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
@@ -33,15 +41,18 @@ export default function SummaryPage() {
   const completedRuns = project.runs.filter((r) => r.status === 'completed').length
   const surveyFlow = surveyFlowState(project.survey, hasRuns)
   const groupFlow = groupFlowState(g)
+  const connections = useConnectionStore((s) => s.connections)
+  const modelFlow = modelFlowState(project.model, hasKey, SERVER_STORAGE ? connections : undefined)
 
   const steps = [
     { key: 'survey', label: '설문', state: SURVEY_STEP_LABEL[surveyFlow.code], tone: surveyFlow.tone, to: `/p/${project.id}/design/survey` },
     { key: 'group', label: '대상 집단', state: GROUP_STEP_LABEL[groupFlow.code], tone: groupFlow.tone, to: `/p/${project.id}/design/target` },
+    { key: 'model', label: '응답 모델', state: MODEL_STEP_LABEL[modelFlow.code] || modelFlow.label.replace(' 선택됨', ''), tone: modelFlow.tone, to: `/p/${project.id}/design/model` },
     { key: 'sim', label: '시뮬레이션', state: hasRuns ? `실행 완료 ${completedRuns}건` : '실행 기록 없음', tone: hasRuns ? 'info' : 'todo', to: `/p/${project.id}/simulation` },
   ]
   const ready = surveyFlow.ready && groupFlow.ready
   const cta = ready
-    ? { label: '새 시뮬레이션', to: `/p/${project.id}/simulation` }
+    ? null
     : !surveyFlow.ready
       ? { label: '설문 계속 작성하기', to: `/p/${project.id}/design/survey` }
       : { label: '대상 집단 구성하기', to: `/p/${project.id}/design/target` }
@@ -66,7 +77,12 @@ export default function SummaryPage() {
   return (
     <>
       <PageHead title={project.name} sub={project.description || ''}>
-        <button className="primary" onClick={() => navigate(cta.to)}>{cta.label}</button>
+        {cta ? <button className="primary" onClick={() => navigate(cta.to)}>{cta.label}</button> : (
+          <>
+            <button onClick={() => navigate(`/p/${project.id}/simulation`)}>실행 설정 보기</button>
+            <button className="primary" disabled={!canRun} onClick={confirmRun}>{running ? `실행 중 ${running.progress}%` : '시뮬레이션 실행'}</button>
+          </>
+        )}
       </PageHead>
       <section className="card step-flow">
         {steps.map((step, i) => (
@@ -98,7 +114,7 @@ export default function SummaryPage() {
         </section>
         <section className="card sum">
           <h2>대상 집단</h2>
-          <p className="big">{g.name} · {g.count}명</p>
+          <p className="big">{g.name} · {countText(g)}</p>
           <FilterChips filters={g.filters} />
           <p className="muted small-text">저장된 대상 집단 {project.groups.length}개{groupStale(g) ? ' · 이 집단은 다시 구성이 필요합니다' : ''}</p>
           <button className="small" onClick={() => navigate(`/p/${project.id}/design/target`)}>대상 집단 열기</button>
@@ -108,8 +124,8 @@ export default function SummaryPage() {
           {last ? (
             <>
               <p className="big">실행 #{last.number} <StatusTag run={last} /></p>
-              <p className="muted">{stamp(last.created)} · {last.groupName} {last.people.length}명</p>
-              {last.status === 'completed' ? <button className="small" onClick={() => openResult(last.id)}>결과 보기</button> : null}
+              <p className="muted">{stamp(last.created)} · {last.groupName} {runPeopleCount(last)}명</p>
+              {hasRunResults(last) ? <button className="small" onClick={() => openResult(last.id)}>결과 보기</button> : null}
             </>
           ) : (
             <p className="muted">아직 실행하지 않았습니다. 설계를 마친 뒤 시뮬레이션을 실행하세요.</p>
@@ -120,7 +136,7 @@ export default function SummaryPage() {
         <section className="card">
           <div className="card-top">
             <h2>최근 실행</h2>
-            <button className="small" onClick={() => navigate(`/p/${project.id}/runs`)}>실행 기록 전체</button>
+            <button className="small" onClick={() => navigate(`/p/${project.id}/results`)}>실행 기록 전체</button>
           </div>
           {project.runs.length
             ? project.runs.slice(0, 3).map((r) => <RunRow key={r.id} projectId={project.id} run={r} />)
