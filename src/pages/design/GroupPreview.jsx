@@ -56,7 +56,9 @@ export default function GroupPreview({ group, stale }) {
             </div>
           ))}
         </div>
-        <p className="muted small-text">가상 시연 프로필입니다. 원자료 분포 비율대로 뽑았으며 실제 레코드를 추출한 것이 아닙니다.</p>
+        <p className="muted small-text">{group.cohort.source?.kind === 'parquet'
+          ? 'Parquet 원본에서 조건에 맞는 레코드를 중복 없이 추출했습니다. 선정된 프로필은 DB에 저장됩니다.'
+          : '가상 시연 프로필입니다. 원자료 분포 비율대로 뽑았으며 실제 레코드를 추출한 것이 아닙니다.'}</p>
       </section>
     </>
   )

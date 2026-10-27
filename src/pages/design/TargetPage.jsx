@@ -10,6 +10,8 @@ import { useUiStore } from '../../store/useUiStore.js'
 import { DesignStepNav, DesignStepper } from './designSteps.jsx'
 import GroupPreview from './GroupPreview.jsx'
 import { useFocusAfterRender } from './useFocusAfterRender.js'
+import { SERVER_STORAGE } from '../../store/useProjectStore.js'
+import { usePersonaData, usePersonaCount } from '../../store/usePersonaData.js'
 
 /* 원본 targetPage() */
 export default function TargetPage() {
@@ -24,6 +26,9 @@ export default function TargetPage() {
   const removeTargetFilter = useProjectStore((s) => s.removeTargetFilter)
   const applyTargetFilter = useProjectStore((s) => s.applyTargetFilter)
   const buildCohort = useProjectStore((s) => s.buildCohort)
+  const buildServerCohort = useProjectStore((s) => s.buildServerCohort)
+  const building = useProjectStore((s) => s.buildingCohorts || {})
+  const { schema, loading: datasetLoading, error: datasetError, load: loadDataset } = usePersonaData()
   const openFilterModal = useUiStore((s) => s.openFilterModal)
   const openConfirm = useUiStore((s) => s.openConfirm)
   const closeConfirm = useUiStore((s) => s.closeConfirm)
@@ -31,7 +36,9 @@ export default function TargetPage() {
   const focusAfterRender = useFocusAfterRender()
 
   const g = project.groups.find((x) => x.id === project.activeGroupId) || project.groups[0]
-  const est = estimateCount(g.filters)
+  const actual = usePersonaCount(schema, g.filters, SERVER_STORAGE)
+  const est = SERVER_STORAGE ? { estimate: actual.count ?? 0, total: schema?.total || 0 } : estimateCount(g.filters)
+  const busy = !!building[project.id + ':' + g.id]
   const stale = groupStale(g)
   const err = groupError(g)
   const flow = groupFlowState(g)
@@ -52,7 +59,7 @@ export default function TargetPage() {
   }
   function handleOpenTargetFilter() {
     openFilterModal({
-      mode: 'target', title: '대상 조건 선택', filters: g.filters, need: g.count, start: 'age',
+      mode: 'target', title: '대상 조건 선택', filters: g.filters, need: g.count, start: 'age', schema: SERVER_STORAGE ? schema : undefined,
       onApply: (f) => applyTargetFilter(project.id, g.id, f),
     })
   }
@@ -61,8 +68,8 @@ export default function TargetPage() {
     const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
     setGroupCount(project.id, g.id, digits === '' ? null : Number(digits))
   }
-  function handleBuild() {
-    const result = buildCohort(project.id, g.id)
+  async function handleBuild() {
+    const result = SERVER_STORAGE ? await buildServerCohort(project.id, g.id, schema.id) : buildCohort(project.id, g.id)
     if (!result.ok) { showToast(result.error); return }
     showToast(`${g.name} · ${g.count}명을 구성했습니다.`)
   }
@@ -98,11 +105,18 @@ export default function TargetPage() {
               </div>
             </div>
             <div className="cond-box">
-              <div className="card-top"><h3>대상 조건</h3><button className="small" onClick={handleOpenTargetFilter}>조건 선택</button></div>
+              <div className="card-top"><h3>대상 조건</h3><button className="small" disabled={SERVER_STORAGE && !schema} onClick={handleOpenTargetFilter}>조건 선택</button></div>
               <FilterChips filters={g.filters} onRemove={(key) => removeTargetFilter(project.id, g.id, key)} />
+              {SERVER_STORAGE ? <p role="status" className={datasetError || actual.error ? 'err-text' : 'estimate'}>
+                {datasetLoading ? '원본 데이터 정보를 불러오는 중입니다…'
+                  : datasetError ? <>{datasetError} <button className="small" onClick={loadDataset}>다시 불러오기</button></>
+                    : actual.loading ? '조건에 맞는 원본을 조회 중입니다…'
+                      : actual.error ? <>{actual.error} <button className="small" onClick={actual.retry}>조회 재시도</button></>
+                        : <>조건에 맞는 페르소나 <b>{actual.count.toLocaleString()}명</b> / {est.total.toLocaleString()}명 <span className="muted small-text">· 원본 조회</span></>}
+              </p> : <>
               <p className={`estimate ${hasCount(g) && est.estimate < g.count ? 'warn-text' : ''}`}>
                 조건에 맞는 페르소나 <b>약 {est.estimate.toLocaleString()}명</b> / {est.total.toLocaleString()}명 <span className="muted small-text">(항목끼리 독립이라고 가정한 추정치)</span>
-              </p>
+              </p></>}
             </div>
             <div className="row align-end">
               <div className="field count-field">
@@ -121,10 +135,10 @@ export default function TargetPage() {
                   onChange={(ev) => handleCountChange(ev.target.value)}
                 />
               </div>
-              <button className="primary" disabled={!!err} onClick={handleBuild}>{g.cohort ? '대상 집단 다시 구성' : '대상 집단 구성'}</button>
+              <button className="primary" disabled={!!err || busy || (SERVER_STORAGE && (!schema || actual.loading || !!actual.error || est.estimate < g.count))} onClick={handleBuild}>{busy ? '원본 추출·저장 중…' : g.cohort ? '대상 집단 다시 구성' : '대상 집단 구성'}</button>
             </div>
             {err ? <p className="err-text" id="g-count-err" role="alert">{err}</p> : null}
-            {hasCount(g) && est.estimate < g.count ? <p className="warn-text small-text">조건에 맞는 인원이 구성할 인원보다 적을 수 있습니다. 조건을 줄이거나 인원을 낮추세요.</p> : null}
+            {hasCount(g) && (!SERVER_STORAGE || (!actual.loading && !actual.error)) && est.estimate < g.count ? <p className="warn-text small-text">조건에 맞는 인원이 부족합니다. 조건을 줄이거나 인원을 낮추세요.</p> : null}
             {g.cohort?.textFiltersIgnored?.length ? <p className="muted small-text">서술 조건({g.cohort.textFiltersIgnored.join(', ')})은 시연 데이터에 서술이 없어 구성에 적용되지 않았습니다.</p> : null}
           </section>
           {g.cohort ? <GroupPreview group={g} stale={stale} /> : (

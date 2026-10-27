@@ -72,6 +72,16 @@ export function createProjectSync({ api, storage, onStatus, onHydrate, onReplace
       for (const [id, entry] of Object.entries(entries)) {
         if (!bases.has(id)) restored.unshift({ ...entry.document, updated: new Date().toISOString() })
       }
+      // Outbox documents contain server cohort references only. Recover their immutable
+      // profiles before rendering, including a completed build not yet attached to a draft.
+      for (const project of restored) {
+        project.groups = project.groups.map((g) => ({ ...g }))
+        for (const group of project.groups) {
+          if (!group.cohort?.id || group.cohort.people) continue
+          const cached = bases.get(project.id)?.groups.find((g) => g.cohort?.id === group.cohort.id)?.cohort
+          group.cohort = cached || await api.getCohort(project.id, group.cohort.id)
+        }
+      }
       onHydrate(restored)
       ready = true
       persist()

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 
 import personaSchema from '../../data/personaSchema.json'
-import { districtName, field } from '../../lib/schema.js'
+import { districtName } from '../../lib/schema.js'
 import { displayRegion } from '../../utils/format.js'
 
 /* 원본 fmRegionHtml()/fmRegion() — 시·도 전체 또는 시·군·구 선택, 부모·자식 체크박스 동기화 */
-export default function RegionPicker({ selected, onSnapshot, onChange }) {
+export default function RegionPicker({ selected, onSnapshot, onChange, schema = personaSchema }) {
   const [optSearch, setOptSearch] = useState('')
   const needle = optSearch.trim()
-  const opts = field('region').options
+  const opts = schema.fields.find((f) => f.key === 'region').options
 
   function toggle(regionValue, rows, childIndex, checked) {
     onSnapshot()
@@ -34,11 +34,11 @@ export default function RegionPicker({ selected, onSnapshot, onChange }) {
 
   return (
     <>
-      <p className="muted small-text">시·도 전체 또는 시·군·구를 고르세요. 오른쪽 숫자는 원자료 100만 명 중 인원입니다.</p>
+      <p className="muted small-text">시·도 전체 또는 시·군·구를 고르세요. 오른쪽 숫자는 원자료 {schema.total.toLocaleString()}명 중 인원입니다.</p>
       <input id="fm-opt-search" placeholder="시·도, 시·군·구 검색" aria-label="지역 검색" value={optSearch} onChange={(ev) => setOptSearch(ev.target.value)} />
       <div className="fm-options" id="fm-opts">
         {opts.map((o) => {
-          const rows = personaSchema.regionDistricts.filter((d) => d.region === o.value)
+          const rows = schema.regionDistricts.filter((d) => d.region === o.value)
           const vis = rows.filter((d) => !needle || (displayRegion(o.value) + districtName(d.district)).includes(needle))
           if (needle && !vis.length) return null
           const all = selected.includes(o.value)

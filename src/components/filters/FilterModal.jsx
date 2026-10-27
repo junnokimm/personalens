@@ -9,6 +9,7 @@ import FilterChips from './FilterChips.jsx'
 import { fmFields, fmOptions } from './filterModalHelpers.js'
 import Modal from '../common/Modal.jsx'
 import RegionPicker from './RegionPicker.jsx'
+import { usePersonaCount } from '../../store/usePersonaData.js'
 
 /* 원본 conditions.js 전체(openFilterModal/renderFM과 그 보조 함수들) — 전역 FM을 컴포넌트 state로 옮김.
  * mode가 'target'(대상 집단)/'persona'(페르소나 필터) 두 가지로 재사용된다. */
@@ -16,6 +17,7 @@ export default function FilterModal({ opts }) {
   const closeFilterModal = useUiStore((s) => s.closeFilterModal)
   const fields = fmFields(opts)
   const base = opts.mode === 'persona' ? (opts.base || opts.run.people) : null
+  const definition = (key) => opts.schema?.fields.find((f) => f.key === key) || field(key)
 
   const [draft, setDraft] = useState(() => clone(opts.filters || {}))
   const [history, setHistory] = useState([])
@@ -64,11 +66,11 @@ export default function FilterModal({ opts }) {
     if (t.length && Math.min(...t) === min && Math.max(...t) === max) {
       setDraft((d) => { const next = { ...d }; delete next[active]; return next })
     } else {
-      setField(active, field(active).options.filter((o) => { const s = tScore(o.value); return s >= min && s <= max }).map((o) => o.value))
+      setField(active, definition(active).options.filter((o) => { const s = tScore(o.value); return s >= min && s <= max }).map((o) => o.value))
     }
   }
   function handleBig5RangeChange(lo, hi) {
-    setField(active, field(active).options.filter((o) => { const s = tScore(o.value); return s >= lo && s <= hi }).map((o) => o.value))
+    setField(active, definition(active).options.filter((o) => { const s = tScore(o.value); return s >= lo && s <= hi }).map((o) => o.value))
   }
   function apply() {
     opts.onApply(clone(draft))
@@ -160,7 +162,7 @@ function FieldEditor({ opts, base, field: f, draft, optSearch, limit, onBack, on
     return (
       <>
         {head}
-        <p className="muted small-text">서술 내용에 포함될 검색어를 한 줄에 하나씩 입력하세요. 하나라도 포함되면 조건에 맞습니다. 시연 데이터에는 서술이 없어 집단 구성에는 적용되지 않습니다.</p>
+        <p className="muted small-text">서술 내용에 포함될 검색어를 한 줄에 하나씩 입력하세요. 하나라도 포함되면 조건에 맞습니다. {opts.schema ? '원본 서술에 실제로 적용됩니다.' : '시연 데이터에는 서술이 없어 집단 구성에는 적용되지 않습니다.'}</p>
         <textarea id="fm-keywords" rows={6} placeholder={'예: 등산\n여행'} value={sel.join('\n')} onChange={(ev) => onKeywords(ev.target.value)} />
       </>
     )
@@ -169,7 +171,7 @@ function FieldEditor({ opts, base, field: f, draft, optSearch, limit, onBack, on
     return (
       <>
         {head}
-        <Big5Range fieldKey={f.key} selected={sel} onLevelClick={onBig5LevelClick} onRangeChange={onBig5RangeChange} />
+        <Big5Range fieldKey={f.key} definition={opts.schema?.fields.find((x) => x.key === f.key)} selected={sel} onLevelClick={onBig5LevelClick} onRangeChange={onBig5RangeChange} />
       </>
     )
   }
@@ -177,14 +179,14 @@ function FieldEditor({ opts, base, field: f, draft, optSearch, limit, onBack, on
     return (
       <>
         {head}
-        <RegionPicker selected={draft.region || []} onSnapshot={onRegionSnapshot} onChange={onRegionChange} />
+        <RegionPicker schema={opts.schema} selected={draft.region || []} onSnapshot={onRegionSnapshot} onChange={onRegionChange} />
       </>
     )
   }
   const options = fmOptions(opts, base, f.key)
   const oNeedle = optSearch.trim().toLowerCase()
   const shown = options.filter((o) => !oNeedle || o.label.toLowerCase().includes(oNeedle))
-  const desc = opts.mode === 'target' ? `값 ${options.length.toLocaleString()}개 · 오른쪽 숫자는 원자료 100만 명 중 인원` : `값 ${options.length}개 · 오른쪽 숫자는 이 실행 응답자 중 인원`
+  const desc = opts.mode === 'target' ? `값 ${options.length.toLocaleString()}개 · 오른쪽 숫자는 원자료 ${(opts.schema?.total || 1000000).toLocaleString()}명 중 인원` : `값 ${options.length}개 · 오른쪽 숫자는 이 실행 응답자 중 인원`
   return (
     <>
       {head}
@@ -210,6 +212,12 @@ function FieldEditor({ opts, base, field: f, draft, optSearch, limit, onBack, on
 
 /* 원본 fmCountHtml() */
 function FilterCount({ opts, base, draft }) {
+  const actual = usePersonaCount(opts.schema, draft, opts.mode === 'target' && !!opts.schema)
+  if (actual) return <div className="fm-count" role="status">
+    {actual.loading ? '조건에 맞는 원본을 조회 중입니다…' : actual.error ? <span className="err-text">{actual.error} <button className="small" onClick={actual.retry}>조회 재시도</button></span>
+      : <><span>조건에 맞는 페르소나 <b>{actual.count.toLocaleString()}명</b> / {actual.total.toLocaleString()}명</span>
+        <small>{actual.count < (opts.need || 0) ? '구성할 인원보다 적습니다. 조건을 줄이거나 인원을 낮추세요.' : '원본 레코드를 조회한 정확한 인원입니다.'}</small></>}
+  </div>
   if (opts.mode === 'target') {
     const e = estimateCount(draft)
     const short = opts.need && e.estimate < opts.need

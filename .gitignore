@@ -1,11 +1,15 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
 .DS_Store
 .venv/
 __pycache__/
 .pytest_cache/
 .runtime/
+# Raw persona datasets are distributed separately from the source code.
+*.parquet
 
 # Claude 작업 파일 (깃허브에 올리지 않음)
 CLAUDE.md

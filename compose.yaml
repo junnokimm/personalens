@@ -1,0 +1,130 @@
+name: ${COMPOSE_PROJECT_NAME:-persona-lens}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-environment: &app-environment
+  PERSONA_DATABASE_URL: postgresql+psycopg://persona_lens:${PERSONA_DB_PASSWORD:?Initialize the Compose environment first}@db:5432/persona_lens
+  PERSONA_ENCRYPTION_KEY: ${PERSONA_ENCRYPTION_KEY:?Initialize the Compose environment first}
+  PERSONA_COOKIE_SECURE: ${PERSONA_COOKIE_SECURE:-true}
+  PERSONA_ALLOWED_ORIGINS: ${PERSONA_ALLOWED_ORIGINS:?Set the exact browser origin}
+  PERSONA_DGX_ALLOWED_BASE_URLS: ${PERSONA_DGX_ALLOWED_BASE_URLS:-[]}
+  PERSONA_MOCK_PROVIDER_BASE_URL: ""
+
+x-backend: &backend
+  image: persona-lens-api:${PERSONA_IMAGE_TAG:-local}
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  init: true
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: *logging
+  stop_grace_period: 45s
+
+services:
+  db:
+    image: postgres:18-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: persona_lens
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Initialize the Compose environment first}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      PERSONA_DB_PASSWORD: ${PERSONA_DB_PASSWORD:?Initialize the Compose environment first}
+    volumes:
+      # PostgreSQL 18 uses a versioned PGDATA beneath /var/lib/postgresql.
+      - postgres_data:/var/lib/postgresql
+      - type: bind
+        source: ./deploy/init-db.sh
+        target: /docker-entrypoint-initdb.d/01-persona.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      # The entrypoint's temporary init server only has a Unix socket. Check TCP
+      # so migrations cannot start until roles and the final server are ready.
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d persona_lens"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+    stop_grace_period: 60s
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    environment: *app-environment
+    command: [alembic, upgrade, head]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    environment:
+      <<: *app-environment
+      PERSONA_PARQUET_PATH: /data/ko_KR.parquet
+    # Only Caddy publishes a host port. Trust forwarded headers within this private
+    # Compose network; do not publish the API port without revisiting this trust.
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --workers, "1", --proxy-headers, --forwarded-allow-ips, "*"]
+    volumes:
+      - type: bind
+        source: ${PERSONA_PARQUET_HOST_PATH:?Set the absolute source file path}
+        target: /data/ko_KR.parquet
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    environment: *app-environment
+    command: [python, -m, app.worker, --concurrency, "4"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: persona-lens-web:${PERSONA_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PERSONA_SITE_ADDRESS: ${PERSONA_SITE_ADDRESS:?Set the Caddy site address}
+    ports:
+      - "${PERSONA_BIND_ADDRESS:-127.0.0.1}:${PERSONA_HTTP_PORT:-8080}:80"
+      - "${PERSONA_BIND_ADDRESS:-127.0.0.1}:${PERSONA_HTTPS_PORT:-8443}:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging: *logging
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

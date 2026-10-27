@@ -2,6 +2,30 @@
 
 기존 React/Zustand 편집기와 결과 분석 화면을 유지하면서 설계, 실행 스냅샷, 작업 상태, 시연 응답을 PostgreSQL에 저장한다. API와 별도 프로세스인 워커가 응답을 생성하므로 브라우저를 닫아도 실행이 계속된다. 로그인·개인/공용 모델 연결·모델 목록 조회와 선택 저장을 지원한다. **실제 LLM 응답 생성은 아직 연결하지 않았으며 워커는 시연 응답만 만든다.**
 
+## Parquet 원본 대상 집단
+
+서버 모드의 대상 집단은 DuckDB로 실제 Parquet 레코드를 추출한다. `backend/.env`에 `PERSONA_PARQUET_PATH=/절대/경로/ko_KR.parquet`를 설정하고 `uv sync --locked`, `uv run alembic upgrade head` 후 API를 실행한다. 원본은 읽기 전용이며 저장소 안에 복사하지 않는다. 다른 컴퓨터에서는 API 서버가 읽을 수 있는 경로를 설정해야 한다. 원본 연결이 없거나 조회가 실패하면 오류를 표시하며 시연 프로필로 자동 대체하지 않는다.
+
+현재 개발 파일 `/Users/junnokimm/dev/ko_KR.parquet`는 **1,000,000행·51컬럼**이다. 실제 파일에서 확인했으며 700만 명으로 표시하지 않는다. 최초 접근 시 전체 파일 SHA-256을 데이터 버전으로 계산하고 UUID 중복·결측, 나이·성격 형식을 검사한다. 같은 프로세스에서는 파일 상태가 바뀔 때만 다시 읽는다.
+
+- 같은 조건 항목은 OR, 다른 항목은 AND다. 시·도와 시·군·구의 중복 선택은 중복 집계하지 않는다. 서술은 대소문자 무시·문자열 포함 검색이며 `%`, `_`도 일반 문자다. 성격은 JSON의 T점수로 비교한다.
+- 원본 정수 `age`는 기존 화면의 연령대 문자열로 표시하고 실제 나이를 `attributes.ageYears`에 보존한다. 나머지 원본 컬럼·서술은 해당 행에서 함께 가져온다. 표시 ID는 `P-001` 형식을 유지하며 원본 UUID는 `sourceRecordId`와 `attributes.uuid`에 남긴다.
+- 조건별 인원은 정확한 원본 행 수다. 항목 옆 숫자는 **전체 원본**에서 해당 값의 인원이며 다른 조건을 적용한 분할 집계는 아니다. 동일 조건 조회 캐시는 파일 버전별 최대 256개다.
+- 조건에 맞는 UUID를 `SHA-256(UUID + seed)` 순으로 정렬한 뒤 앞 N명을 뽑는다. 같은 파일·조건·seed·알고리즘 버전이면 재현된다. 새 구성은 새 요청 ID를 seed로 사용하고 네트워크 재시도는 기존 ID를 유지한다. 요청 인원보다 원본이 적으면 422로 거부하며 인원을 복제하지 않는다.
+- `persona_datasets`에 원본 버전 정보를, `persona_cohorts`에 원본 UUID·속성·조건·seed를 고정 저장한다. DB 트리거로 변경·삭제를 막는다. 기존 `target_groups.cohort`와 실행 스냅샷에는 검증된 사본을 저장한다.
+- 구성 API는 설계 저장 이후 호출한다. 원본 조회 중 DB 잠금을 유지하지 않고, 완료 직전에 설계 수정 번호를 다시 확인한다. 브라우저에서도 조건 변경·집단 삭제를 검사한다. 프로젝트 자동 저장에는 `{cohort: {id}}` 참조만 보내며 서버가 해당 프로젝트의 고정 집단을 읽어 채운다. 클라이언트가 보낸 속성으로 덮어쓰지 않는다.
+- 원본 파일이 나중에 없어져도 저장된 집단·과거 결과는 DB에서 복원한다. 기존 시연 집단·실행도 보존한다. **실제 페르소나로 실행해도 응답은 시연 방식이며 외부 모델을 호출하지 않는다.**
+- 동시에 최대 2개 원본 조회, 조회당 DuckDB 스레드 2개·메모리 512MB로 제한한다. 현재 집단 구성은 HTTP 요청 중 처리하며 별도 영속 추출 작업 큐는 없다. 브라우저를 닫기 전 ‘DB에 저장됨’을 확인한다. 기존 설문 실행 워커의 영속성은 그대로다.
+
+| API | 동작 |
+| --- | --- |
+| `GET /api/v1/persona-dataset` | 로그인 후 데이터 버전·실제 행 수·필드·선택지별 인원·지역 목록 |
+| `POST /api/v1/persona-dataset/count` | `{datasetId, filters}` → `{datasetId, count, total}` |
+| `POST /api/v1/projects/{id}/cohorts` | `{datasetId, groupId, expectedRevision, requestId}` → 201, 고정 집단. 초안에 붙이는 저장은 기존 프로젝트 API 사용 |
+| `GET /api/v1/projects/{id}/cohorts/{cohortId}` | 프로젝트 소유자만 고정 집단 조회. 미저장 참조 복원에도 사용 |
+
+원본 경로는 서버 설정에서만 받고 검색 컬럼은 서버 필드 목록으로 제한하며 검색 값은 SQL 매개변수로 전달한다. 파일 버전 변경·설계 충돌은 409, 잘못된 조건·인원 부족은 422, 원본 부재·조회 실패는 503이다.
+
 ## 실행
 
 필요 도구: Node.js, Python 3.12 이상, uv, PostgreSQL 18. Python 패키지는 `pyproject.toml`과 `uv.lock`으로 고정한다.
@@ -90,13 +114,15 @@ DGX 기본 주소는 `http://127.0.0.1:8001/dgx/v1`이다. 모의 모드 UI는 �
 | `responses` | 실행×페르소나×문항별 응답. 복합 기본키로 중복 저장 방지 |
 | `users` | 아이디·이름·scrypt 비밀번호 해시·관리자 여부 |
 | `auth_sessions` | 세션 토큰의 SHA-256 해시·사용자·7일 만료 시각 |
+| `persona_datasets` | Parquet 버전 해시·서버 경로·행 수·컬럼 수 |
+| `persona_cohorts` | 프로젝트 소유의 불변 원본 표본·추출 조건·seed·요청 ID |
 | `model_connections` | 소유자·개인/공용·공급자·기본 주소·암호화 키·활성 상태·모델 캐시·조회 상태·수정 번호 |
 
 문항의 `id/type/parentId/text/options/otherEnabled/scale/low/high`와 기존 `survey/groups/activeGroupId/model` 구조를 유지한다. `count: null`, 빈 설문 제목·문항·선택지 등 **미완성 초안도 저장**한다. 인원 초안은 입력창 범위인 0~9999를 허용하고 기존 프론트의 구성 검증은 10~500을 유지한다. 잘못된 참조, 중복 ID, 없는 활성 집단, 마지막 집단 삭제는 거부한다.
 
 이번 단계의 저장 단위는 **프로젝트 하나의 설계 전체**이다. 설문·집단·선택 상태를 한 트랜잭션에서 저장하고 프로젝트 수정 번호로 충돌을 검사한다. 이를 통해 기존 동기식 Zustand 편집 액션을 유지하고, 집단 삭제와 활성 집단 변경 사이의 불일치를 피한다. 앞서 검토한 개별 설문·집단 API는 실제 실행을 분리하는 후속 단계에서 필요에 따라 추가한다.
 
-API 키, 응답·인터뷰, 화면 상태는 설계 저장 요청 본문에 넣지 않는다. 새 실행과 응답은 서버 DB에서 복원한다. 로컬 시연 기록·인터뷰와 미저장 초안·접수 재시도 ID는 사용자 ID로 저장 공간을 구분한다. 이전 사용자 미구분 서버 outbox/cache는 자동 복원하지 않는다. 설문 `version/history/draft`는 서버에서 확정된 설문 버전으로 계산하며 클라이언트가 보낸 버전 정보는 신뢰하지 않는다. 구성된 페르소나는 현재 프론트에서 만든 시연 프로필이며 원자료 추출이 아니다.
+API 키, 응답·인터뷰, 화면 상태는 설계 저장 요청 본문에 넣지 않는다. 새 실행과 응답은 서버 DB에서 복원한다. 로컬 시연 기록·인터뷰와 미저장 초안·접수 재시도 ID는 사용자 ID로 저장 공간을 구분한다. 이전 사용자 미구분 서버 outbox/cache는 자동 복원하지 않는다. 설문 `version/history/draft`는 서버에서 확정된 설문 버전으로 계산하며 클라이언트가 보낸 버전 정보는 신뢰하지 않는다. 새 대상 집단은 Parquet 실제 레코드로 구성하며, 기존 시연 프로필은 구분해서 보존한다.
 
 실행 접수 시 프로젝트 행을 잠그고 저장 수정 번호를 검사한 뒤, 설문 버전과 집단 스냅샷·작업을 한 트랜잭션에서 생성한다. 설문 내용이 직전 버전과 같으면 버전을 재사용한다. 이후 초안을 수정하거나 대상집단을 변경·삭제해도 기존 실행은 영향을 받지 않는다. 실행의 입력 스냅샷은 DB 트리거로 변경을 금지한다.
 
@@ -187,6 +213,107 @@ PostgreSQL 작업 테이블을 큐로 사용한다. `FOR UPDATE SKIP LOCKED`로 
 7. 실행 상태는 2초마다 API에서 갱신한다. 브라우저는 응답을 생성하지 않는다. 결과는 조회할 때 DB에서 불러오며 새 탭이나 다른 브라우저에서도 같은 URL로 복원된다.
 
 서버 없이 이전 프로토타입을 실행하려면 `npm run dev:demo`를 사용한다. 기본 `npm run dev`는 서버 저장 모드이며 연결 실패 시 로컬 시연으로 자동 전환하지 않는다.
+
+## Docker로 로컬 배포 검증
+
+이번 구성은 배포 파일을 로컬에서 검증하는 용도다. 실제 서버 배포와 LLM 추론은 포함하지 않는다. 기존 개발용 PostgreSQL·5173/8000 서버는 그대로 유지하고, Compose는 별도 DB 볼륨과 `http://localhost:8080`을 사용한다. 팀원이 저장소를 받아도 원본은 자동 전송되지 않는다. 개발 화면을 `127.0.0.1:5173`으로 열고 Compose는 `localhost:8080`으로 열면 두 DB의 로그인 쿠키도 분리된다(쿠키는 포트별로 분리되지 않는다).
+
+필요 도구: Docker Engine + Compose v2 이상(BuildKit 지원), 설정 생성용 Python 3. 애플리케이션용 Node.js·Python·uv·PostgreSQL은 이미지에 포함된다. 빌드에는 이미지/패키지 레지스트리 접근이 필요하다. 저장소 **루트**에서:
+
+```sh
+python3 scripts/init_compose.py --parquet /absolute/path/to/ko_KR.parquet
+bash scripts/compose.sh local config --quiet
+bash scripts/compose.sh local up --build -d --wait
+```
+
+macOS에서 Docker Desktop 대신 Colima를 쓰는 경우의 예시다. Docker Desktop/Linux Engine 사용자는 이 설정이 필요 없다. Homebrew 플러그인 경로는 `brew --prefix`에 맞게 조정한다. 기존 Docker 설정을 바꾸지 않도록 프로젝트 안에 별도 CLI 설정을 둔다.
+
+```sh
+brew install colima docker docker-compose docker-buildx
+# 아래 dev 경로는 원본과 저장소가 있는 상위 폴더로 맞춘다. 기본은 읽기 전용 마운트다.
+colima start persona-lens --activate=false --ssh-config=false --cpu 4 --memory 8 --disk 30 --mount "$HOME/dev"
+mkdir -p .runtime/docker-client
+printf '%s\n' '{"cliPluginsExtraDirs":["/opt/homebrew/lib/docker/cli-plugins"]}' > .runtime/docker-client/config.json
+export DOCKER_CONFIG="$PWD/.runtime/docker-client"
+export DOCKER_HOST="unix://$HOME/.colima/persona-lens/docker.sock"
+# 위 환경 변수를 설정한 터미널에서 compose.sh를 실행한다.
+```
+
+생성기는 Git에서 제외된 `.env.compose`를 0600 권한으로 만든다. DB 관리자 비밀번호·앱 비밀번호·암호화 키는 각각 생성하고 출력하지 않는다. 재실행해도 기존 설정/키를 덮어쓰지 않는다. 원본은 경로만 기록하며 복사/수정하지 않는다. 포트 변경 시 HTTP 포트와 허용 Origin을 함께 변경한다.
+
+첫 접속에서 관리자 계정을 만든 뒤 모델 연결 화면에서 팀원을 등록한다. 프로젝트/결과는 계정별로 분리되며 공동 편집 권한은 아직 없다. 로컬 모의 연결:
+
+| 공급자 | 가짜 키 | DGX 기본 주소 |
+| --- | --- | --- |
+| OpenAI | `fake-openai-test` | 해당 없음 |
+| Anthropic | `fake-anthropic-test` | 해당 없음 |
+| DGX Spark | `fake-dgx-test` | `http://127.0.0.1:8001/dgx/v1` |
+
+8001은 **API 컨테이너가 바라보는 주소**다. 모의 서버는 API 네트워크 네임스페이스를 공유하고 외부 포트를 열지 않는다. 기존 localhost 전용 모의 서버 제한은 유지한다. 응답은 별도 워커의 시연 생성기로 만들며 외부 모델을 호출하지 않는다.
+
+### 서비스와 데이터
+
+| 서비스 | 역할 | 저장/접근 |
+| --- | --- | --- |
+| `web` | Caddy, React 빌드, `/api` 프록시, SPA 경로 복원 | 로컬 8080/8443 게시. 인증서와 설정은 별도 볼륨 |
+| `db` | PostgreSQL 18 | `postgres_data`를 `/var/lib/postgresql`에 연결. DB 포트 게시 없음 |
+| `migrate` | `alembic upgrade head` | DB 준비 후 실행. 성공해야 API/워커 시작 |
+| `api` | FastAPI·DuckDB | 원본을 `/data/ko_KR.parquet`에 **읽기 전용** 마운트. API 포트 게시 없음 |
+| `worker` | DB 작업 큐의 시연 실행 | 원본 마운트 없음. DB 실행 스냅샷 사용 |
+| `mock-provider` | 가짜 모델 목록 | `compose.local.yaml`에만 존재 |
+
+API/워커는 비특권 사용자와 읽기 전용 루트 파일시스템으로 실행한다. PostgreSQL 초기화 관리자와 앱 DB 소유자는 별도이며 앱은 클러스터 슈퍼유저가 아니다. DB 비밀번호는 URL에 사용되므로 생성한 16진수 형식을 유지한다. 기존 볼륨의 비밀번호는 환경 파일 수정만으로 바뀌지 않으며 DB 역할 비밀번호도 함께 변경해야 한다.
+
+`.dockerignore` 허용 목록은 `.env*`, 원본, 개발 DB, Git 이력, 호스트 가상환경을 빌드에서 제외한다. `src/data/personaSchema.json`은 API 이미지에 포함한다. 최초 원본 조회에서 버전 계산/검사를 수행한다. `/api/v1/health`는 API·DB만 확인하므로 원본/워커 검증을 대체하지 않는다.
+
+원본이 없으면 빈 폴더를 대신 만들지 않고 마운트를 실패시킨다. Linux에서는 UID 10001이 원본과 상위 경로를 읽을 수 있도록 권한을 준비한다. 파일은 웹 정적 경로에 배치하지 않는다. 원본 교체 시 새 버전을 배치하고 API 컨테이너를 재생성한다.
+
+### 시연·재시작 검증
+
+빈 로컬 DB에서 아래 명령을 실행한다. 기존 수동 관리자 계정이 있는 DB는 수동 UI 검증을 사용한다. 검증 스크립트는 샘플 계정·프로젝트·연결을 생성하고 기존 데이터를 지우지 않는다.
+
+```sh
+bash scripts/compose.sh local stop worker
+python3 scripts/smoke_compose.py prepare
+# 클라이언트 종료 뒤 queued 작업을 남긴 채 모든 컨테이너 재생성:
+bash scripts/compose.sh local down
+bash scripts/compose.sh local up -d --wait
+python3 scripts/smoke_compose.py verify
+```
+
+검증 범위는 세 공급자 가짜 키 등록/조회, 실제 조건별 인원과 10명 추출, 계정 간 프로젝트 접근 차단, DB 집단/모델 선택 복원, 암호화 키로 연결 재조회, 10명×2문항 시연과 중복 없는 20개 응답, 새 로그인 결과 복원이다. 임의 생성한 관리자 로그인 정보와 검증 상태는 `.runtime/compose-smoke.json`에 0600으로 보관하며 Git에서 제외한다. 스크립트는 loopback HTTP 주소만 허용한다.
+
+```sh
+bash scripts/compose.sh local ps
+bash scripts/compose.sh local logs --tail=100 api worker
+bash scripts/compose.sh local down
+```
+
+`down`은 볼륨을 보존한다. **`down -v`는 DB와 인증서를 삭제하므로 사용하지 않는다.** 재시작 정책은 `unless-stopped`이고 Docker 엔진이 켜져 있어야 한다. 수동 중지한 컨테이너는 `up`으로 다시 시작한다. 원본 추출은 아직 HTTP 요청 중 처리하며 API 프로세스당 동시 2개 제한이다. 부하가 몰리면 재시도가 필요할 수 있다. 실행 워커의 큐/체크포인트는 DB에 보존된다.
+
+### 연구실 서버용 설정
+
+`deploy/production.env.example`을 `.env.production`으로 복사하고 **별도로 생성한** DB 비밀번호, Fernet 키, 서버 원본 경로, 실제 도메인/Origin을 설정한다. 예시 도메인은 교체한다. 기본 Compose에는 모의 서버가 없지만 현재 워커는 계속 시연 응답만 생성한다. 실제 LLM 추론 연결은 별도다.
+
+```sh
+# 설정 검토만 수행. 전체 config 출력에는 비밀 값이 포함될 수 있다.
+bash scripts/compose.sh production config --quiet
+```
+
+HTTPS에서는 `PERSONA_COOKIE_SECURE=true`를 유지한다. Caddy 공개 인증서 발급에는 해당 DNS와 인증 방식에 필요한 네트워크 접근이 필요하다. 내부 도메인은 학교 인증서 또는 신뢰할 내부 CA 설정을 별도로 준비한다. 학교 네트워크/방화벽은 자동 변경하지 않는다. 관리자 초기 등록은 접근을 제한한 상태에서 먼저 완료한다.
+
+API는 Compose 내부 Caddy의 전달 헤더를 신뢰한다. 이 전제를 유지하도록 API/DB 포트를 호스트에 게시하지 않는다. 웹 포트는 학교 방화벽에서 허용 범위를 제한한다. 로그는 컨테이너당 10MB×3개(모의 서버 5MB×2개)로 순환한다.
+
+DB 백업 예시(로컬 검증 DB, 저장소 루트):
+
+```sh
+mkdir -p .runtime/backups
+bash scripts/compose.sh local exec -T db pg_dump -U postgres -Fc persona_lens > .runtime/backups/persona_lens.dump
+```
+
+운영에서는 날짜별 백업을 서버 외부에 보관하고 별도 빈 DB에 `pg_restore`하여 복구를 확인한다. DB 덤프 외에 원본/해시, 환경 설정, `PERSONA_ENCRYPTION_KEY`도 안전하게 보관한다. 키가 없으면 저장된 모델 API 키를 복호화할 수 없다. 업데이트는 DB 백업 → 배포 커밋의 이미지 빌드 → 마이그레이션 → 컨테이너 재생성 → 검증 순서다. DB가 변경되었으면 이전 이미지로 되돌릴 때 스키마 호환성도 확인한다.
+
+참고: [Compose 운영 구성](https://docs.docker.com/compose/how-tos/production/), [PostgreSQL 공식 이미지와 18 데이터 경로](https://hub.docker.com/_/postgres), [Caddy HTTPS](https://caddyserver.com/docs/automatic-https), [uv Docker 사용](https://docs.astral.sh/uv/guides/integration/docker/).
 
 ## 검증
 

@@ -13,6 +13,7 @@ import { useUiStore } from './useUiStore.js'
 import { getSessionIdentity, projectApi, surveyContent } from '../lib/projectApi.js'
 import { createProjectSync } from './projectSync.js'
 import { createServerRunActions } from './serverRuns.js'
+import { createServerCohortActions } from './serverCohorts.js'
 
 const STORE_KEY = 'personascope-proto-v4'
 const DEMO_KEY = 'personalens-demo-results-v1'
@@ -57,6 +58,7 @@ const storage = {
 
 const projectState = immer((set, get) => ({
       ...(SERVER_STORAGE ? createServerRunActions(set, get, () => projectSync) : {}),
+      ...(SERVER_STORAGE ? createServerCohortActions(set, get, () => projectSync) : {}),
       projects: [],
       dataStatus: SERVER_STORAGE ? 'loading' : 'ready',
       loadError: '',

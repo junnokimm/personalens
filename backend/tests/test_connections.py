@@ -71,7 +71,7 @@ def test_setup_sessions_csrf_and_legacy_ownership(raw_client, database):
     from app.schemas import SaveProject
     with Session(database) as db:
         project = Project(id="project-test", groups=[])
-        apply_document(project, SaveProject.model_validate(operation()), "legacy")
+        apply_document(project, SaveProject.model_validate(operation()), "legacy", db)
         db.add(project); db.commit()
     rejected = raw_client.post(PREFIX + "/auth/setup", json=ADMIN, headers={"Origin": "https://untrusted.example"})
     assert rejected.status_code == 403

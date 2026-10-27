@@ -11,10 +11,10 @@ export const BIG5 = ['openness', 'conscientiousness', 'extraversion', 'agreeable
 export const BIG5_LEVELS = ['매우 낮음', '낮음', '보통', '높음', '매우 높음']
 export const tScore = (v) => { try { return JSON.parse(v).t_score } catch { return Number(v) } }
 export const big5Level = (v) => { try { return JSON.parse(v).label } catch { return '' } }
-export function big5Ranges(key) {
+export function big5Ranges(key, definition = field(key)) {
   const out = {}
-  for (const o of field(key).options) { const t = tScore(o.value), l = big5Level(o.value); out[l] = out[l] ? [Math.min(out[l][0], t), Math.max(out[l][1], t)] : [t, t] }
-  return BIG5_LEVELS.map((label) => ({ label, min: out[label][0], max: out[label][1] }))
+  for (const o of definition.options) { const t = tScore(o.value), l = big5Level(o.value); out[l] = out[l] ? [Math.min(out[l][0], t), Math.max(out[l][1], t)] : [t, t] }
+  return BIG5_LEVELS.filter((label) => out[label]).map((label) => ({ label, min: out[label][0], max: out[label][1] }))
 }
 
 /* 분석(집단 나누기·선택지 비교·페르소나 필터)에 함께 쓰는 속성 목록 — R-03 */

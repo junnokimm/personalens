@@ -43,6 +43,26 @@ class TargetGroup(Base):
     project: Mapped[Project] = relationship(back_populates="groups")
 
 
+class PersonaDataset(Base):
+    __tablename__ = "persona_datasets"
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    source_path: Mapped[str] = mapped_column(Text)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PersonaCohort(Base):
+    __tablename__ = "persona_cohorts"
+    __table_args__ = (UniqueConstraint("project_id", "request_id"),)
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("persona_datasets.id"))
+    request_id: Mapped[str] = mapped_column(String(100))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class SurveyVersion(Base):
     __tablename__ = "survey_versions"
     __table_args__ = (UniqueConstraint("project_id", "version"),)

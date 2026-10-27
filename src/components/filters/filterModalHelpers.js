@@ -6,7 +6,7 @@ import { choices, qLabel } from '../../lib/survey.js'
 /* 원본 conditions.js의 fmFields()/fmField()/fmOptions() — 전역 FM 대신 opts/base를 인자로 받는다 */
 export function fmFields(opts) {
   if (opts.mode === 'target') {
-    return personaSchema.fields.map((f) => ({ key: f.key, label: attrLabel(f.key), group: f.group, type: BIG5.includes(f.key) ? 'big5' : f.key === 'region' ? 'region' : f.type }))
+    return (opts.schema || personaSchema).fields.map((f) => ({ key: f.key, label: attrLabel(f.key), group: f.group, type: BIG5.includes(f.key) ? 'big5' : f.key === 'region' ? 'region' : f.type }))
   }
   const r = opts.run, out = []
   for (const q of r.survey.questions) if (q.type !== 'text') out.push({ key: 'resp:' + q.id, label: qLabel(r.survey, q) + ' 응답', group: '응답 조건', type: 'category' })
@@ -18,7 +18,7 @@ export function fmField(opts, key) { return fmFields(opts).find((f) => f.key ===
 /* 값 목록 {value,label,count} */
 export function fmOptions(opts, base, key) {
   if (opts.mode === 'target') {
-    return field(key).options.map((o) => ({ value: o.value, label: o.label, count: o.count }))
+    return (opts.schema?.fields.find((f) => f.key === key) || field(key)).options.map((o) => ({ value: o.value, label: o.label, count: o.count }))
   }
   if (key.startsWith('resp:')) {
     const q = opts.run.survey.questions.find((x) => x.id === key.slice(5))

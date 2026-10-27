@@ -3,12 +3,12 @@ import { big5Ranges, field, tScore } from '../../lib/schema.js'
 /* 원본 fmBig5Html() — Big5 5단계 버튼 + 20~80점 범위 슬라이더.
  * 슬라이더는 끄는 동안(onRangeChange)은 숫자·조건만 갱신하고 되돌리기 기록을 남기지 않는다(원본 fmBig5Soft).
  * 단계 버튼(onLevelClick)은 같은 구간을 다시 누르면 해제하고, 되돌리기 기록을 남긴다(원본 fmBig5). */
-export default function Big5Range({ fieldKey, selected, onLevelClick, onRangeChange }) {
-  const ranges = big5Ranges(fieldKey)
+export default function Big5Range({ fieldKey, definition = field(fieldKey), selected, onLevelClick, onRangeChange }) {
+  const ranges = big5Ranges(fieldKey, definition)
   const t = selected.map(tScore)
   const lo = t.length ? Math.min(...t) : 20
   const hi = t.length ? Math.max(...t) : 80
-  const count = field(fieldKey).options.filter((o) => { const s = tScore(o.value); return s >= lo && s <= hi }).reduce((a, o) => a + o.count, 0)
+  const count = definition.options.filter((o) => { const s = tScore(o.value); return s >= lo && s <= hi }).reduce((a, o) => a + o.count, 0)
 
   function handleRange(which, value) {
     if (which === 'lo') onRangeChange(Math.min(value, hi), hi)

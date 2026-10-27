@@ -37,7 +37,7 @@ def test_roundtrip_and_database_rows(client, database):
     with database.connect() as db:
         assert db.scalar(text("SELECT survey->>'title' FROM projects")) == "정책 설문"
         assert db.scalar(text("SELECT count FROM target_groups")) == 10
-    assert set(inspect(database).get_table_names()) == {"projects", "target_groups", "alembic_version", "survey_versions", "runs", "run_tasks", "responses", "users", "auth_sessions", "model_connections"}
+    assert set(inspect(database).get_table_names()) == {"projects", "target_groups", "alembic_version", "survey_versions", "runs", "run_tasks", "responses", "users", "auth_sessions", "model_connections", "persona_datasets", "persona_cohorts"}
 
 
 def test_incomplete_drafts_are_saved(client):

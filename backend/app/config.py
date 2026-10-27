@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     dgx_allowed_base_urls: list[str] = []
     # Explicit opt-in for isolated, fake-key testing. Never changes production provider URLs.
     mock_provider_base_url: str = ""
+    parquet_path: str = ""
 
 
 settings = Settings()
