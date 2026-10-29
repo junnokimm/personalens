@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.auth import COOKIE, now
+from app.auth import COOKIE, hash_password, now
 from app.config import settings
 from app.main import app
 from app.mock_provider import Handler
@@ -96,6 +96,29 @@ def test_expired_session_and_missing_csrf_header(client, database):
         db.execute(update(AuthSession).values(expires=now() - timedelta(seconds=1))); db.commit()
     assert client.get(PREFIX + "/connections").status_code == 401
     assert client.post(PREFIX + "/projects", json=operation()).status_code == 401
+
+
+def test_login_accepts_existing_short_password_and_preserves_owner(client, database):
+    assert client.post(PREFIX + "/projects", json=operation()).status_code == 201
+    owner = client.get(PREFIX + "/auth/session").json()["user"]["id"]
+    with Session(database) as db:
+        user = db.get(User, owner)
+        user.username = "renamed-admin"
+        user.password_hash = hash_password("demo1234")
+        db.commit()
+    assert client.post(PREFIX + "/auth/logout").status_code == 200
+    assert client.post(PREFIX + "/auth/login", json={"username": "renamed-admin", "password": "wrong123"}).status_code == 401
+    response = client.post(PREFIX + "/auth/login", json={"username": "renamed-admin", "password": "demo1234"})
+    assert response.status_code == 200
+    assert response.json()["user"]["id"] == owner
+    assert client.get(PREFIX + "/projects/project-test").status_code == 200
+    assert client.post(PREFIX + "/auth/users", json={**MEMBER, "password": "demo1234"}).status_code == 422
+
+
+def test_setup_still_requires_ten_character_password(raw_client):
+    response = raw_client.post(PREFIX + "/auth/setup", json={**ADMIN, "password": "demo1234"})
+    assert response.status_code == 422
+    assert raw_client.get(PREFIX + "/auth/session").json()["needsSetup"] is True
 
 
 @pytest.mark.parametrize("provider,expected", [("openai", ["gpt-demo-small", "gpt-demo-large"]),

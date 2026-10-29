@@ -10,7 +10,20 @@ export function validResponses(r, qid) {
     seen.add(x.personaId); return true
   })
 }
-export const answerOf = (r, pid, qid) => r.responses.find((x) => x.personaId === pid && x.questionId === qid)
+const responseIndexes = new WeakMap()
+export function answerOf(r, pid, qid) {
+  let cached = responseIndexes.get(r.responses)
+  if (!cached || cached.length !== r.responses.length) {
+    const index = new Map()
+    for (const response of r.responses) {
+      const key = `${response.personaId}::${response.questionId}`
+      if (!index.has(key)) index.set(key, response)
+    }
+    cached = { length: r.responses.length, index }
+    responseIndexes.set(r.responses, cached)
+  }
+  return cached.index.get(`${pid}::${qid}`)
+}
 export function distribution(r, qid) {
   const q = r.survey.questions.find((x) => x.id === qid), rows = validResponses(r, qid)
   return choices(q).map((label, i) => { const count = rows.filter((x) => x.answer === i).length; return { label, count, percent: rows.length ? (count / rows.length) * 100 : 0 } })

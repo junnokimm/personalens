@@ -38,7 +38,7 @@ export default function RunsPage() {
                   <td>{stamp(r.created)}</td>
                   <td>v{r.survey.version} · {r.survey.questions.length}문항</td>
                   <td>{r.groupName} · {runPeopleCount(r)}명</td>
-                  <td><span className="muted">{r._server ? '서버 시연 · DB 저장' : '이전 로컬 시연'}</span></td>
+                  <td><span className="muted">{r.engine?.kind === 'openai' ? `${r.engine.mock ? '모의 OpenAI' : 'OpenAI'} · ${r.engine.selectedModel?.modelId}` : r._server ? '서버 시연 · DB 저장' : '이전 로컬 시연'}</span></td>
                   <td>
                     <StatusTag run={r} />
                     {r._server ? <p className="muted small-text">성공 {r.succeeded}/{r.total} · 실패 {r.failed}</p> : null}

@@ -1,8 +1,11 @@
+import { useEffect } from 'react'
 import personaSchema from '../../data/personaSchema.json'
+import { useProjectStore } from '../../store/useProjectStore.js'
 import { attrLabel, attrValue, BIG5, districtName, tScore } from '../../lib/schema.js'
 import { displayRegion } from '../../utils/format.js'
 import { useUiStore } from '../../store/useUiStore.js'
-import PersonasView, { chatsOf } from './PersonasView.jsx'
+import PersonasView, { chatCountOf } from './PersonasView.jsx'
+import { useInterviewStore } from '../../store/useInterviewStore.js'
 import PeopleTrail from './PeopleTrail.jsx'
 import { useResultUrl } from './ResultUrlContext.jsx'
 import { drillFilters } from './resultUrlState.js'
@@ -46,19 +49,24 @@ export function ProfileCard({ person, compact }) {
 
 /* 원본 detailView() */
 export default function DetailView({ project, run }) {
+  useInterviewStore((s) => s.threads)
   const { qid, drill, personaId, navigateResult } = useResultUrl()
   const pf = useUiStore((s) => s.pf)
   const urlFilters = drillFilters(qid, drill)
   const effectivePf = Object.keys(urlFilters).length ? urlFilters : pf
 
   const person = run.people.find((p) => p.id === personaId)
+  const loadPerson = useProjectStore((s) => s.loadRunPerson)
+  const error = useProjectStore((s) => s.personErrors?.[`person:${run.id}:${personaId}`])
+  useEffect(() => { if (run._server && person?.compact) void loadPerson(project.id, run.id, person.id) }, [project.id, run.id, person?.id, person?.compact, loadPerson])
   if (!person) return <PersonasView project={project} run={run} />
+  if (person.compact) return <section className="card">{error || '전체 프로필을 불러오는 중…'}{error && <button onClick={() => loadPerson(project.id, run.id, person.id)}>다시 불러오기</button>}</section>
 
   function openChat(questionId) {
     navigateResult({ view: 'chat', chatQid: questionId ?? qid })
   }
 
-  const chatCount = chatsOf(project, run, person.id).length
+  const chatCount = chatCountOf(project, run, person.id)
 
   return (
     <>
@@ -81,7 +89,7 @@ export default function DetailView({ project, run }) {
               ))}
             </dl>
           </details>
-          <p className="muted small-text">가상 시연 프로필 · 실제 사람 자료와 대조하지 않았습니다.</p>
+          <p className="muted small-text">{person.sourceRecordId ? 'Parquet 원본에서 추출해 실행 시점에 저장한 합성 페르소나입니다.' : '가상 시연 프로필입니다.'}</p>
         </section>
         <section className="card">
           <h3>설문 응답 · 전체 {run.survey.questions.length}문항</h3>

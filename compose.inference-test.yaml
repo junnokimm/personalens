@@ -1,0 +1,15 @@
+# Isolated fake-key validation of the actual request/response pipeline.
+# Use together with compose.local.yaml. Never enter real keys in this mode.
+services:
+  api:
+    environment:
+      PERSONA_OPENAI_INFERENCE_ENABLED: "true"
+  worker:
+    network_mode: service:api
+    environment:
+      PERSONA_MOCK_PROVIDER_BASE_URL: http://127.0.0.1:8001
+      PERSONA_OPENAI_INFERENCE_ENABLED: "true"
+    command: [python, -m, app.worker, --concurrency, "2"]
+    depends_on:
+      mock-provider:
+        condition: service_healthy

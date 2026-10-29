@@ -562,3 +562,10 @@ details.demo { margin-top: 14px; font-size: 12px; color: var(--muted); }
 .connection-picker .field { flex: 1 1 300px; margin: 0; }
 .connection-url, .model-main b, .model-main .small-text { overflow-wrap: anywhere; }
 .topbar { flex-wrap: wrap; gap: 12px; }
+/* Server-confirmed survey progress, with failed work visually separate. */
+.run-progress-panel { margin-top: 20px; padding-top: 20px; border-top: 1px solid #dce3ec; }
+.run-progress-track { display: flex; height: 14px; overflow: hidden; border-radius: 7px; background: #e8edf4; }
+.run-progress-track > span { display: block; transition: width .25s ease; }
+.run-progress-success { background: #4476b8; }
+.run-progress-failed { background: #dc9739; }
+@media (prefers-reduced-motion: reduce) { .run-progress-track > span { transition: none; } }

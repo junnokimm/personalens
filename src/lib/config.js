@@ -4,5 +4,5 @@ export const CONFIG = {
   MIN_CELL: 5,        // 비교 구간 최소 인원 (미만이면 흐리게 + 순위 제외)
   HIGHLIGHT_PP: 10,   // 차이 강조 기준 (%p)
   MIN_PERSONAS: 10,
-  MAX_PERSONAS: 500,
+  MAX_PERSONAS: 10000,
 }

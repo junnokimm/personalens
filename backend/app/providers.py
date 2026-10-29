@@ -107,6 +107,8 @@ def discover(provider, base_url, key):
     base_url = endpoint(provider, base_url)  # Recheck allowlist on every outbound request.
     if settings.mock_provider_base_url and provider in PROVIDERS and not key.startswith("fake-"):
         raise ApiError(422, "FAKE_KEY_REQUIRED", "모의 서버 모드에서는 fake-로 시작하는 가짜 키만 사용할 수 있습니다.")
+    if not settings.mock_provider_base_url and provider in PROVIDERS and key.startswith("fake-"):
+        raise ApiError(422, "REAL_KEY_REQUIRED", "실제 API 모드입니다. 새 연결에 실제 키를 입력하세요.")
     headers = {"Accept": "application/json"}
     if provider == "anthropic":
         headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})

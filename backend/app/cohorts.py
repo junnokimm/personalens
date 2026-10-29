@@ -17,6 +17,7 @@ from .models import PersonaCohort, PersonaDataset
 from .persona_data import dataset, query_slot
 from .schemas import Contract, Identifier
 from .snapshots import digest
+from .profiles import public_cohort
 
 router = APIRouter(prefix="/api/v1")
 
@@ -69,7 +70,7 @@ def resolve_cohort(session, project_id, cohort):
 @router.get("/projects/{project_id}/cohorts/{cohort_id}")
 def read_cohort(project_id: str, cohort_id: str, user: CurrentUser, session: Session = Depends(get_session)):
     owned_project(session, project_id, user)
-    return get_cohort(session, project_id, cohort_id)
+    return public_cohort(get_cohort(session, project_id, cohort_id))
 
 
 @router.post("/projects/{project_id}/cohorts", status_code=201)
@@ -81,12 +82,12 @@ def build(project_id: str, body: BuildCohort, user: CurrentUser, session: Sessio
     if existing:
         if existing.request_hash != request_hash:
             raise ApiError(409, "REQUEST_REUSED", "같은 추출 요청 ID에 다른 내용을 보낼 수 없습니다.")
-        return existing.payload
+        return public_cohort(existing.payload)
     if project.revision != body.expectedRevision:
         raise ApiError(409, "REVISION_CONFLICT", "최신 대상 조건을 저장한 뒤 다시 구성하세요.")
     group = next((g for g in project.groups if g.id == body.groupId), None)
-    if group is None or group.count is None or not 10 <= group.count <= 500:
-        raise ApiError(422, "INVALID_GROUP", "추출할 집단과 인원(10~500명)을 확인하세요.")
+    if group is None or group.count is None or not 10 <= group.count <= 10000:
+        raise ApiError(422, "INVALID_GROUP", "추출할 집단과 인원(10~10,000명)을 확인하세요.")
     filters, size = copy.deepcopy(group.filters), group.count
     # Do not hold a transaction or a project lock while scanning Parquet.
     session.rollback()
@@ -108,7 +109,7 @@ def build(project_id: str, body: BuildCohort, user: CurrentUser, session: Sessio
     if existing:
         if existing.request_hash != request_hash:
             raise ApiError(409, "REQUEST_REUSED", "이미 사용된 추출 요청 ID입니다.")
-        return existing.payload
+        return public_cohort(existing.payload)
     if project.revision != body.expectedRevision:
         raise ApiError(409, "REVISION_CONFLICT", "추출 중 설계가 변경되었습니다. 현재 조건으로 다시 구성하세요.")
     session.execute(insert(PersonaDataset).values(id=source.id, source_path=str(source.path),
@@ -117,4 +118,4 @@ def build(project_id: str, body: BuildCohort, user: CurrentUser, session: Sessio
     session.add(PersonaCohort(id=payload["id"], project_id=project_id, dataset_id=source.id,
         request_id=body.requestId, request_hash=request_hash, payload=payload, created=timestamp))
     session.commit()
-    return payload
+    return public_cohort(payload)

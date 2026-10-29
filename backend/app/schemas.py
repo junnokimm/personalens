@@ -55,6 +55,7 @@ class Survey(SurveyContent):
 class Person(Contract):
     id: Identifier
     attributes: dict[str, JsonValue]
+    compact: bool = Field(default=False, exclude_if=lambda v: not v)
     sourceRecordId: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
@@ -63,7 +64,7 @@ class Cohort(Contract):
     source: dict[str, JsonValue] | None = Field(default=None, exclude_if=lambda v: v is None)
     builtFrom: str
     created: str
-    people: list[Person] = Field(max_length=500)
+    people: list[Person] = Field(max_length=10000)
     textFiltersIgnored: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -80,8 +81,8 @@ class CohortReference(Contract):
 class Group(Contract):
     id: Identifier
     name: str = ""
-    # Empty/temporarily invalid counts are valid *drafts*. Execution still requires 10–500.
-    count: int | None = Field(default=100, ge=0, le=9999, strict=True)
+    # Empty/temporarily invalid counts are valid drafts. Execution requires 10–10,000.
+    count: int | None = Field(default=100, ge=0, le=10000, strict=True)
     filters: dict[str, list[str]] = Field(default_factory=dict)
     cohort: Cohort | CohortReference | None = None
 

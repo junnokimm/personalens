@@ -126,7 +126,7 @@ export default function TargetPage() {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  maxLength={4}
+                  maxLength={5}
                   placeholder={`${CONFIG.MIN_PERSONAS}~${CONFIG.MAX_PERSONAS}`}
                   value={g.count == null ? '' : String(g.count)}
                   className={err ? 'invalid' : ''}

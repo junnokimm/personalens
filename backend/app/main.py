@@ -20,12 +20,15 @@ from .auth import CurrentUser, owned_project, router as auth_router
 from .connections import router as connections_router, validate_selection
 from .config import settings
 from .cohorts import router as cohorts_router, resolve_cohort
+from .interviews import router as interviews_router
+from .profiles import public_cohort
 
 app = FastAPI(title="PersonaLens persistence API", version="0.1.0")
 app.include_router(runs_router)
 app.include_router(auth_router)
 app.include_router(connections_router)
 app.include_router(cohorts_router)
+app.include_router(interviews_router)
 DB = Annotated[Session, Depends(get_session)]
 
 
@@ -67,7 +70,7 @@ async def database_error(_request: Request, _error: OperationalError):
 def response(project: Project, session: Session) -> ProjectResponse:
     return ProjectResponse(
         id=project.id, name=project.name, description=project.description, survey=current_survey(session, project),
-        groups=[dict(id=g.id, name=g.name, count=g.count, filters=g.filters, cohort=g.cohort) for g in project.groups],
+        groups=[dict(id=g.id, name=g.name, count=g.count, filters=g.filters, cohort=public_cohort(g.cohort)) for g in project.groups],
         activeGroupId=project.active_group_id, model=project.model,
         revision=project.revision, lastMutationId=project.last_mutation_id,
         updated=project.updated.isoformat().replace("+00:00", "Z"),

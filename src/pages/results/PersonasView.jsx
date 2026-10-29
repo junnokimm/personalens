@@ -7,21 +7,25 @@ import { useUiStore } from '../../store/useUiStore.js'
 import { displayRegion } from '../../utils/format.js'
 import { useResultUrl } from './ResultUrlContext.jsx'
 import { drillFilters } from './resultUrlState.js'
+import { interviewKey, useInterviewStore } from '../../store/useInterviewStore.js'
 
 const PER_PAGE = 15
 const SORT_OPTIONS = [['id', 'ID 순'], ['age', '연령대 순'], ['region', '지역 순'], ['chats', '대화 많은 순']]
 
 /* 원본 chatsOf() — DetailView·ChatView도 같이 쓴다 */
 export const chatsOf = (project, run, personaId) => project.chats[run.id + '::' + personaId] || []
+export const chatCountOf = (project, run, personaId) => run._server
+  ? (useInterviewStore.getState().threads[interviewKey(run.id, personaId)]?.turns.length ?? run.interviewCounts?.[personaId] ?? 0)
+  : chatsOf(project, run, personaId).length
 
 /* 원본 personaList() */
 function personaList({ project, run, pf, pChatted, pSearch, pSort }) {
   let people = filterPeople(run, pf)
   const matched = people.length
-  if (pChatted) people = people.filter((p) => chatsOf(project, run, p.id).length)
+  if (pChatted) people = people.filter((p) => chatCountOf(project, run, p.id))
   const needle = pSearch.trim().toLowerCase()
   if (needle) people = people.filter((p) => [p.id, ...Object.values(p.attributes).map(String), attrValue(p, 'region')].join(' ').toLowerCase().includes(needle))
-  const sorters = { id: (p) => p.id, age: (p) => attrValue(p, 'age'), region: (p) => attrValue(p, 'region'), chats: (p) => -chatsOf(project, run, p.id).length }
+  const sorters = { id: (p) => p.id, age: (p) => attrValue(p, 'age'), region: (p) => attrValue(p, 'region'), chats: (p) => -chatCountOf(project, run, p.id) }
   people = people.slice().sort((a, b) => String(sorters[pSort](a)).localeCompare(String(sorters[pSort](b)), 'ko', { numeric: true }))
   return { people, matched }
 }
@@ -29,6 +33,7 @@ function personaList({ project, run, pf, pChatted, pSearch, pSort }) {
 /* 원본 personasView()/personaResults() — respCol·pPage가 유효하지 않으면(실행을 바꿨을 때)
  * store에 쓰지 않고 표시할 때만 기본값을 계산한다(전환 규칙 2번) */
 export default function PersonasView({ project, run }) {
+  useInterviewStore((s) => s.threads)
   const { qid, drill, navigateResult } = useResultUrl()
   const pf = useUiStore((s) => s.pf)
   const pSearch = useUiStore((s) => s.pSearch)
@@ -106,7 +111,7 @@ export default function PersonasView({ project, run }) {
             <tbody>
               {shown.length ? shown.map((p) => {
                 const a = answerOf(run, p.id, rq.id)
-                const n = chatsOf(project, run, p.id).length
+                const n = chatCountOf(project, run, p.id)
                 return (
                   <tr key={p.id} className="click" tabIndex={0} onClick={() => openPersona(p.id)} onKeyDown={(ev) => { if (ev.key === 'Enter') openPersona(p.id) }}>
                     <td><b>{p.id}</b></td>

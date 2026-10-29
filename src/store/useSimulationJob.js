@@ -37,9 +37,9 @@ function tick(projectId, runId) {
 }
 
 /* 원본 startRun(): 진행 중인 실행이 있으면 막고, 새 실행을 만들어 바로 타이머를 시작한다 */
-export function startRun(projectId) {
-  const failNext = useUiStore.getState().failNext
-  if (SERVER_STORAGE) return useProjectStore.getState().startServerRun(projectId, failNext)
+export function startRun(projectId, execution = { engine: 'demo' }) {
+  const failNext = execution.engine === 'openai' ? false : useUiStore.getState().failNext
+  if (SERVER_STORAGE) return useProjectStore.getState().startServerRun(projectId, failNext, execution)
   const result = useProjectStore.getState().startRun(projectId, { failNext })
   if (!result.ok) { useUiStore.getState().showToast(result.error); return result }
   tick(projectId, result.runId)

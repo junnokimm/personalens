@@ -189,7 +189,7 @@ describe('legacy-parity', () => {
   })
 
   it('CONFIG, choices, attrValue, field이 같다', () => {
-    expect(CONFIG).toEqual(legacy.PS.CONFIG)
+    expect(CONFIG).toEqual({ ...legacy.PS.CONFIG, MAX_PERSONAS: 10000 })
     const q = { id: 'q-x', type: 'likert', parentId: null, text: '질문', options: [], otherEnabled: false, scale: 5, low: '낮음', high: '높음' }
     expect(choices(q)).toEqual(legacy.PS.choices(q))
     const person = { id: 'P-001', attributes: { age: '30대', sex: '여자', region: '서울' } }

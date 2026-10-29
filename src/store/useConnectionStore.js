@@ -6,7 +6,7 @@ export const CONNECTION_STATUS = { unchecked: '확인 전', ready: '모델 목�
 
 // Public metadata only. Keys are held briefly by the form and never enter a store.
 export const useConnectionStore = create((set) => ({
-  connections: [], dgxAllowedBaseUrls: [], mockMode: false, loading: false, error: '', loaded: false,
+  connections: [], dgxAllowedBaseUrls: [], mockMode: false, openaiInferenceEnabled: false, inferenceLimits: {}, loading: false, error: '', loaded: false,
   async load() {
     set({ loading: true, error: '' })
     try { set({ ...await request('/connections'), loaded: true }) }

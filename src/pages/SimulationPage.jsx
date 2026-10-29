@@ -10,11 +10,12 @@ import { useUiStore } from '../store/useUiStore.js'
 import { modelName } from '../lib/models.js'
 import { josa } from '../utils/format.js'
 import { useConfirmRun } from './useConfirmRun.jsx'
+import RunProgress from '../components/common/RunProgress.jsx'
 
 /* 원본 sameAsRun() */
 function sameAsRun(project, g) {
   if (project.survey.draft || groupStale(g)) return null
-  return project.runs.find((r) => r.status === 'completed' && r.groupId === g.id && r.survey.version === project.survey.version
+  return project.runs.find((r) => r.engine?.kind !== 'openai' && r.status === 'completed' && r.groupId === g.id && r.survey.version === project.survey.version
     && new Date(g.cohort.created) <= new Date(r.created)
     && stableJson(r.groupConfig) === stableJson({ count: g.count, filters: g.filters })) || null
 }
@@ -28,9 +29,9 @@ export default function SimulationPage() {
   const resetResultsUi = useUiStore((s) => s.resetResultsUi)
   const failNext = useUiStore((s) => s.failNext)
   const setFailNext = useUiStore((s) => s.setFailNext)
-  const { group: g, errs, groupErr, stale, running, ready, nQ, confirmRun: handleConfirmRun } = useConfirmRun(project)
+  const { group: g, errs, groupErr, stale, running, ready, nQ, confirmRun: handleConfirmRun, execution, executionError } = useConfirmRun(project)
 
-  const same = ready ? sameAsRun(project, g) : null
+  const same = ready && execution.engine === 'demo' ? sameAsRun(project, g) : null
   const last = project.runs.find((r) => r.status === 'completed')
 
   const diffs = last ? [
@@ -71,18 +72,19 @@ export default function SimulationPage() {
         </section>
       </div>
       <section className="card run-card">
-        {SERVER_STORAGE ? <label className="check"><input type="checkbox" checked={failNext} disabled={!!running} onChange={(ev) => setFailNext(ev.target.checked)} />실패·재시도 시연: 한 페르소나의 응답 생성을 한 번 실패시킵니다.</label> : null}
+        {SERVER_STORAGE && execution.engine === 'demo' ? <label className="check"><input type="checkbox" checked={failNext} disabled={!!running} onChange={(ev) => setFailNext(ev.target.checked)} />실패·재시도 시연: 한 페르소나의 응답 생성을 한 번 실패시킵니다.</label> : null}
         <div className="card-top">
           <div>
             <h2>실행</h2>
             <p className="muted">{countText(g)} × 문항 {nQ}개 = 예상 응답 <b>{((g.count || 0) * nQ).toLocaleString()}개</b></p>
-            <p className="muted small-text">{SERVER_STORAGE ? '서버 시연 생성기 · 실제 모델 미연결' : `응답 모델 ${modelName(project.model?.id)}`} · <button className="link" onClick={() => navigate(`/p/${project.id}/design/model`)}>설계에서 변경</button></p>
+            <p className="muted small-text">{SERVER_STORAGE ? execution.label : `응답 모델 ${modelName(project.model?.id)}`} · <button className="link" onClick={() => navigate(`/p/${project.id}/design/model`)}>설계에서 변경</button></p>
+            {executionError && <p className="err-text">{executionError}</p>}
           </div>
           <span className={`tag ${running ? 'info' : ready ? 'ok' : 'bad'}`}>{running ? '실행 중' : ready ? '실행 준비 완료' : '설계 확인 필요'}</span>
         </div>
         {diffs.length ? <p className="small-text muted">실행 #{last.number}{josa(last.number, ['과', '와'])} 비교 · {diffs.join(' · ')}</p> : null}
         {running ? (
-          <Banner tone="info">실행 #{running.number} · {running.status === 'queued' ? '워커 처리 대기 중' : '진행 중'} ({running.progress}%). {SERVER_STORAGE ? '브라우저를 닫아도 서버 워커가 계속 처리합니다.' : '다른 화면으로 이동해도 계속됩니다.'} 프로젝트마다 한 번에 하나씩 실행할 수 있습니다.</Banner>
+          <p className="muted small-text">프로젝트마다 한 번에 하나씩 실행할 수 있습니다.</p>
         ) : same ? (
           <Banner
             tone="info"
@@ -98,6 +100,7 @@ export default function SimulationPage() {
         ) : (
           <button className="primary" disabled={!ready} onClick={handleConfirmRun}>시뮬레이션 실행</button>
         )}
+        {(running || project.runs[0]) && <RunProgress projectId={project.id} run={running || project.runs[0]} openResult={openResult} />}
       </section>
       <p className="muted small-text">
         지난 실행은 <button className="link" onClick={() => navigate(`/p/${project.id}/results`)}>결과 › 실행 기록</button>에서 봅니다.
