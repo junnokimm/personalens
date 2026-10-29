@@ -46,7 +46,7 @@ export default function AuthGate({ children }) {
           <form onSubmit={submit}>
             {state.needsSetup && <div className="field"><label htmlFor="auth-name">이름</label><input id="auth-name" name="name" required maxLength={100} autoComplete="name" /></div>}
             <div className="field"><label htmlFor="auth-user">아이디</label><input id="auth-user" name="username" required minLength={3} maxLength={80} pattern="[a-zA-Z0-9_.@\-]+" autoComplete="username" /></div>
-            <div className="field"><label htmlFor="auth-password">비밀번호</label><input id="auth-password" name="password" type="password" required minLength={10} maxLength={128} autoComplete={state.needsSetup ? 'new-password' : 'current-password'} /></div>
+            <div className="field"><label htmlFor="auth-password">비밀번호</label><input id="auth-password" name="password" type="password" required minLength={state.needsSetup ? 10 : 1} maxLength={128} autoComplete={state.needsSetup ? 'new-password' : 'current-password'} /></div>
             <button className="primary" disabled={busy}>{busy ? '확인 중…' : state.needsSetup ? '관리자 계정 만들기' : '로그인'}</button>
           </form>
         </>}

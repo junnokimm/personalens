@@ -23,6 +23,7 @@ import AuthGate from './components/common/AuthGate.jsx'
 import ConnectionsPage from './pages/ConnectionsPage.jsx'
 import { useConnectionStore } from './store/useConnectionStore.js'
 import { SERVER_STORAGE } from './store/useProjectStore.js'
+import { usePersonaData } from './store/usePersonaData.js'
 
 /* 원본 index.html의 바깥 틀(aside + main + overlay + toast) */
 function RootShell() {
@@ -33,6 +34,7 @@ function RootShell() {
   const loadProjects = useProjectStore((s) => s.loadProjects)
   useEffect(() => { void loadProjects() }, [loadProjects])
   useEffect(() => { if (SERVER_STORAGE) void useConnectionStore.getState().load() }, [])
+  useEffect(() => { if (SERVER_STORAGE) void usePersonaData.getState().load() }, [])
   return (
     <>
       <Sidebar />

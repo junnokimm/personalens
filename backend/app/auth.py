@@ -69,10 +69,11 @@ def owned_project(db, project_id, user, lock=False):
 
 class Login(Contract):
     username: str = Field(min_length=3, max_length=80, pattern=r"^[a-zA-Z0-9_.@-]+$")
-    password: SecretStr = Field(min_length=10, max_length=128)
+    password: SecretStr = Field(min_length=1, max_length=128)
 
 
 class NewUser(Login):
+    password: SecretStr = Field(min_length=10, max_length=128)
     name: str = Field(min_length=1, max_length=100)
 
 

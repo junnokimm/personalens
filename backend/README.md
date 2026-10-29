@@ -1,6 +1,30 @@
 # PersonaLens 백엔드 · 저장·시연 실행·모델 연결 MVP
 
-기존 React/Zustand 편집기와 결과 분석 화면을 유지하면서 설계, 실행 스냅샷, 작업 상태, 시연 응답을 PostgreSQL에 저장한다. API와 별도 프로세스인 워커가 응답을 생성하므로 브라우저를 닫아도 실행이 계속된다. 로그인·개인/공용 모델 연결·모델 목록 조회와 선택 저장을 지원한다. **실제 LLM 응답 생성은 아직 연결하지 않았으며 워커는 시연 응답만 만든다.**
+기존 React/Zustand 편집기와 결과 분석 화면을 유지하면서 설계, 실행 스냅샷, 작업 상태, 응답을 PostgreSQL에 저장한다. API와 별도 프로세스인 워커가 응답을 생성하므로 브라우저를 닫아도 실행이 계속된다. 로그인·개인/공용 모델 연결·모델 목록 조회와 선택 저장을 지원한다. **시연 모드를 유지하면서 OpenAI Responses API 실제 응답을 지원한다. Anthropic·DGX의 실제 추론과 추가 인터뷰는 아직 미연결이다.**
+
+## Parquet 원본 대상 집단
+
+서버 모드의 대상 집단은 DuckDB로 실제 Parquet 레코드를 추출한다. `backend/.env`에 `PERSONA_PARQUET_PATH=/절대/경로/ko_KR.parquet`를 설정하고 `uv sync --locked`, `uv run alembic upgrade head` 후 API를 실행한다. 원본은 읽기 전용이며 저장소 안에 복사하지 않는다. 다른 컴퓨터에서는 API 서버가 읽을 수 있는 경로를 설정해야 한다. 원본 연결이 없거나 조회가 실패하면 오류를 표시하며 시연 프로필로 자동 대체하지 않는다.
+
+현재 개발 파일 `/Users/junnokimm/dev/ko_KR.parquet`는 **1,000,000행·51컬럼**이다. 실제 파일에서 확인했으며 700만 명으로 표시하지 않는다. 최초 접근 시 전체 파일 SHA-256을 데이터 버전으로 계산하고 UUID 중복·결측, 나이·성격 형식을 검사한다. 같은 프로세스에서는 파일 상태가 바뀔 때만 다시 읽는다.
+
+- 같은 조건 항목은 OR, 다른 항목은 AND다. 시·도와 시·군·구의 중복 선택은 중복 집계하지 않는다. 서술은 대소문자 무시·문자열 포함 검색이며 `%`, `_`도 일반 문자다. 성격은 JSON의 T점수로 비교한다.
+- 원본 정수 `age`는 기존 화면의 연령대 문자열로 표시하고 실제 나이를 `attributes.ageYears`에 보존한다. 나머지 원본 컬럼·서술은 해당 행에서 함께 가져온다. 표시 ID는 `P-001` 형식을 유지하며 원본 UUID는 `sourceRecordId`와 `attributes.uuid`에 남긴다.
+- 조건별 인원은 정확한 원본 행 수다. 항목 옆 숫자는 **전체 원본**에서 해당 값의 인원이며 다른 조건을 적용한 분할 집계는 아니다. 동일 조건 조회 캐시는 파일 버전별 최대 256개다.
+- 조건에 맞는 UUID를 `SHA-256(UUID + seed)` 순으로 정렬한 뒤 앞 N명을 뽑는다. 같은 파일·조건·seed·알고리즘 버전이면 재현된다. 새 구성은 새 요청 ID를 seed로 사용하고 네트워크 재시도는 기존 ID를 유지한다. 요청 인원보다 원본이 적으면 422로 거부하며 인원을 복제하지 않는다.
+- `persona_datasets`에 원본 버전 정보를, `persona_cohorts`에 원본 UUID·속성·조건·seed를 고정 저장한다. DB 트리거로 변경·삭제를 막는다. 기존 `target_groups.cohort`와 실행 스냅샷에는 검증된 사본을 저장한다.
+- 구성 API는 설계 저장 이후 호출한다. 원본 조회 중 DB 잠금을 유지하지 않고, 완료 직전에 설계 수정 번호를 다시 확인한다. 브라우저에서도 조건 변경·집단 삭제를 검사한다. 프로젝트 자동 저장에는 `{cohort: {id}}` 참조만 보내며 서버가 해당 프로젝트의 고정 집단을 읽어 채운다. 클라이언트가 보낸 속성으로 덮어쓰지 않는다.
+- 원본 파일이 나중에 없어져도 저장된 집단·과거 결과는 DB에서 복원한다. 기존 시연 집단·실행도 보존한다. 시연 모드는 외부 호출이 없으며, OpenAI 실행은 선택한 페르소나 속성·설문을 OpenAI에 전송한다.
+- 동시에 최대 2개 원본 조회, 조회당 DuckDB 스레드 2개·메모리 512MB로 제한한다. 현재 집단 구성은 HTTP 요청 중 처리하며 별도 영속 추출 작업 큐는 없다. 브라우저를 닫기 전 ‘DB에 저장됨’을 확인한다. 기존 설문 실행 워커의 영속성은 그대로다.
+
+| API | 동작 |
+| --- | --- |
+| `GET /api/v1/persona-dataset` | 로그인 후 데이터 버전·실제 행 수·필드·선택지별 인원·지역 목록 |
+| `POST /api/v1/persona-dataset/count` | `{datasetId, filters}` → `{datasetId, count, total}` |
+| `POST /api/v1/projects/{id}/cohorts` | `{datasetId, groupId, expectedRevision, requestId}` → 201, 고정 집단. 초안에 붙이는 저장은 기존 프로젝트 API 사용 |
+| `GET /api/v1/projects/{id}/cohorts/{cohortId}` | 프로젝트 소유자만 고정 집단 조회. 미저장 참조 복원에도 사용 |
+
+원본 경로는 서버 설정에서만 받고 검색 컬럼은 서버 필드 목록으로 제한하며 검색 값은 SQL 매개변수로 전달한다. 파일 버전 변경·설계 충돌은 409, 잘못된 조건·인원 부족은 422, 원본 부재·조회 실패는 503이다.
 
 ## 실행
 
@@ -40,7 +64,7 @@ uv run python -m app.worker
 
 ## 모델 연결과 선택
 
-상단 **모델 연결 → 연결 등록 → 연결 확인 · 모델 조회**를 거친 뒤 기존 **설계 → 응답 모델**에서 연결과 모델을 고른다. 모델을 선택하면 `{connectionId, modelId}`만 프로젝트 자동 저장에 포함된다. 키와 서버 주소는 실행 스냅샷에 들어가지 않는다. `engine.selectedModel`은 실행 시점 선택 참고값이며, 실제 사용 엔진은 계속 `demo`다.
+상단 **모델 연결 → 연결 등록 → 연결 확인 · 모델 조회**를 거친 뒤 기존 **설계 → 응답 모델**에서 연결과 모델을 고른다. `{connectionId, modelId}`를 프로젝트에 저장한다. OpenAI 실행은 선택 모델·공급자 주소·요청 계정·프롬프트 버전·출력 한도를 실행 시점에 고정한다. 키는 실행 스냅샷에 복사하지 않으며 워커가 호출 직전에 암호화 저장소에서 읽고 권한을 재검사한다.
 
 | 공급자 | 등록 정보 | 조회 방식 |
 | --- | --- | --- |
@@ -76,7 +100,7 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 | Anthropic | `fake-anthropic-test` | `claude-demo-sonnet`, `claude-demo-haiku` (2페이지) |
 | DGX Spark | `fake-dgx-test` 또는 키 없음 | `Qwen/demo-8B`, `GLM/demo-9B` |
 
-DGX 기본 주소는 `http://127.0.0.1:8001/dgx/v1`이다. 모의 모드 UI는 이를 명시하고 OpenAI·Anthropic에 `fake-`로 시작하지 않는 키를 거부한다. 모의 서버는 모델 목록 GET만 구현하며 추론 요청이나 외부 네트워크 요청을 하지 않는다. 공식 공급자를 조회하려면 모의 환경 변수를 비우고 새 연결을 등록한다. 모의 서버 연결은 공식 주소로 자동 전환하지 않는다.
+DGX 기본 주소는 `http://127.0.0.1:8001/dgx/v1`이다. 모의 모드 UI는 이를 명시하고 OpenAI·Anthropic에 `fake-`로 시작하지 않는 키를 거부한다. 모의 서버는 모델 목록과 결정적 Responses fixture만 제공하며 외부 네트워크 요청을 하지 않는다. 공식 공급자를 조회하려면 모의 환경 변수를 비우고 새 연결을 등록한다. 모의 서버 연결은 공식 주소로 자동 전환하지 않는다.
 
 ## 데이터 계약과 저장 구조
 
@@ -90,13 +114,15 @@ DGX 기본 주소는 `http://127.0.0.1:8001/dgx/v1`이다. 모의 모드 UI는 �
 | `responses` | 실행×페르소나×문항별 응답. 복합 기본키로 중복 저장 방지 |
 | `users` | 아이디·이름·scrypt 비밀번호 해시·관리자 여부 |
 | `auth_sessions` | 세션 토큰의 SHA-256 해시·사용자·7일 만료 시각 |
+| `persona_datasets` | Parquet 버전 해시·서버 경로·행 수·컬럼 수 |
+| `persona_cohorts` | 프로젝트 소유의 불변 원본 표본·추출 조건·seed·요청 ID |
 | `model_connections` | 소유자·개인/공용·공급자·기본 주소·암호화 키·활성 상태·모델 캐시·조회 상태·수정 번호 |
 
-문항의 `id/type/parentId/text/options/otherEnabled/scale/low/high`와 기존 `survey/groups/activeGroupId/model` 구조를 유지한다. `count: null`, 빈 설문 제목·문항·선택지 등 **미완성 초안도 저장**한다. 인원 초안은 입력창 범위인 0~9999를 허용하고 기존 프론트의 구성 검증은 10~500을 유지한다. 잘못된 참조, 중복 ID, 없는 활성 집단, 마지막 집단 삭제는 거부한다.
+문항의 `id/type/parentId/text/options/otherEnabled/scale/low/high`와 기존 `survey/groups/activeGroupId/model` 구조를 유지한다. `count: null`, 빈 설문 제목·문항·선택지 등 **미완성 초안도 저장**한다. 인원 초안은 0~10,000, 구성과 실행은 10~10,000명을 허용한다. 잘못된 참조, 중복 ID, 없는 활성 집단, 마지막 집단 삭제는 거부한다.
 
 이번 단계의 저장 단위는 **프로젝트 하나의 설계 전체**이다. 설문·집단·선택 상태를 한 트랜잭션에서 저장하고 프로젝트 수정 번호로 충돌을 검사한다. 이를 통해 기존 동기식 Zustand 편집 액션을 유지하고, 집단 삭제와 활성 집단 변경 사이의 불일치를 피한다. 앞서 검토한 개별 설문·집단 API는 실제 실행을 분리하는 후속 단계에서 필요에 따라 추가한다.
 
-API 키, 응답·인터뷰, 화면 상태는 설계 저장 요청 본문에 넣지 않는다. 새 실행과 응답은 서버 DB에서 복원한다. 로컬 시연 기록·인터뷰와 미저장 초안·접수 재시도 ID는 사용자 ID로 저장 공간을 구분한다. 이전 사용자 미구분 서버 outbox/cache는 자동 복원하지 않는다. 설문 `version/history/draft`는 서버에서 확정된 설문 버전으로 계산하며 클라이언트가 보낸 버전 정보는 신뢰하지 않는다. 구성된 페르소나는 현재 프론트에서 만든 시연 프로필이며 원자료 추출이 아니다.
+API 키, 응답·인터뷰, 화면 상태는 설계 저장 요청 본문에 넣지 않는다. 새 실행과 응답은 서버 DB에서 복원한다. 로컬 시연 기록·인터뷰와 미저장 초안·접수 재시도 ID는 사용자 ID로 저장 공간을 구분한다. 이전 사용자 미구분 서버 outbox/cache는 자동 복원하지 않는다. 설문 `version/history/draft`는 서버에서 확정된 설문 버전으로 계산하며 클라이언트가 보낸 버전 정보는 신뢰하지 않는다. 새 대상 집단은 Parquet 실제 레코드로 구성하며, 기존 시연 프로필은 구분해서 보존한다.
 
 실행 접수 시 프로젝트 행을 잠그고 저장 수정 번호를 검사한 뒤, 설문 버전과 집단 스냅샷·작업을 한 트랜잭션에서 생성한다. 설문 내용이 직전 버전과 같으면 버전을 재사용한다. 이후 초안을 수정하거나 대상집단을 변경·삭제해도 기존 실행은 영향을 받지 않는다. 실행의 입력 스냅샷은 DB 트리거로 변경을 금지한다.
 
@@ -162,7 +188,7 @@ API 키, 응답·인터뷰, 화면 상태는 설계 저장 요청 본문에 넣�
 {"expectedRevision": 7, "requestId": "a-stable-unique-request-id", "groupId": "group-example", "failNext": false}
 ```
 
-- 프론트는 미저장 설계를 먼저 저장한 뒤 승인된 `revision`으로 접수한다. 수정 충돌, 불완전한 설문, 10~500 범위 밖 인원, 구성 후 조건이 바뀐 집단은 실행할 수 없다.
+- 프론트는 미저장 설계를 먼저 저장한 뒤 승인된 `revision`으로 접수한다. 수정 충돌, 불완전한 설문, 10~10,000 범위 밖 인원, 구성 후 조건이 바뀐 집단은 실행할 수 없다.
 - 응답 유실 시 동일 `requestId`와 본문으로 재요청하면 기존 실행을 반환한다. 다른 본문으로 같은 ID를 사용하거나, 같은 프로젝트에서 이미 대기·실행 중이면 409다.
 - 상태: `queued → running → completed / partial_failed / failed`. 대기·실행 중 취소하면 `cancelled`가 된다. 재시도는 실패 작업만 `queued`로 바꾸며 이미 저장된 응답은 보존한다.
 - `total`은 인원×문항 수, `succeeded`는 저장된 응답 수, `failed`는 실패 작업의 아직 생성하지 못한 응답 수다. 진행률은 `(succeeded + failed) / total`이다. 일부 실패도 모든 작업의 처리가 끝났으므로 100%가 될 수 있다.
@@ -172,7 +198,7 @@ API 키, 응답·인터뷰, 화면 상태는 설계 저장 요청 본문에 넣�
 
 PostgreSQL 작업 테이블을 큐로 사용한다. `FOR UPDATE SKIP LOCKED`로 작업을 가져오고, 실행 행 → 작업 행 순서로 잠근다. 생성 중에는 DB 잠금을 유지하지 않는다. 임대 토큰·만료 시각을 매 저장마다 검사하므로 종료된 워커의 늦은 저장은 거부된다. 응답 저장과 다음 문항 위치 갱신은 한 트랜잭션이다. 임대 만료 작업은 재개하며 자동 인계가 3회 실패하면 수동 재시도할 수 있는 실패 상태로 남긴다.
 
-한 페르소나의 문항은 순서대로 처리한다. 후속 질문은 부모 문항의 저장된 응답을 전달받는다. 시연 응답은 고정된 입력과 생성기 버전의 해시로 결정되며, 재시도해도 같은 답을 낸다. **GLM/Qwen/GPT 등 외부 모델을 호출하지 않으며 API 키도 사용하지 않는다.**
+한 페르소나의 문항은 순서대로 처리한다. 후속 질문은 부모 문항의 저장된 응답을 전달받는다. 시연 응답은 고정된 입력과 생성기 버전의 해시로 결정되며, 재시도해도 같은 답을 낸다. **`engine=demo`에서는 외부 모델이나 API 키를 사용하지 않는다. OpenAI 실제 실행은 아래 별도 모드 설명을 따른다.**
 
 응답은 기존 결과 화면과 같은 `{personaId, questionId, answer, text, otherText}` 형식이다. 척도·선택형 `answer`는 **0부터 시작하는 인덱스**이고, 주관식은 `answer: null`과 문자열 `text`를 쓴다. 워커는 저장 전에 응답 ID·타입·범위를 검증한다. 기존 분포·집단 분석·페르소나 조회·CSV 함수를 그대로 재사용한다. 일부 실패·취소 결과는 유효 응답 수를 기준으로 분석하고 누락 안내를 표시한다.
 
@@ -187,6 +213,158 @@ PostgreSQL 작업 테이블을 큐로 사용한다. `FOR UPDATE SKIP LOCKED`로 
 7. 실행 상태는 2초마다 API에서 갱신한다. 브라우저는 응답을 생성하지 않는다. 결과는 조회할 때 DB에서 불러오며 새 탭이나 다른 브라우저에서도 같은 URL로 복원된다.
 
 서버 없이 이전 프로토타입을 실행하려면 `npm run dev:demo`를 사용한다. 기본 `npm run dev`는 서버 저장 모드이며 연결 실패 시 로컬 시연으로 자동 전환하지 않는다.
+
+## Docker로 로컬 배포 검증
+
+이번 구성은 배포 파일을 로컬에서 검증하는 용도다. 실제 서버 배포와 LLM 추론은 포함하지 않는다. 기존 개발용 PostgreSQL·5173/8000 서버는 그대로 유지하고, Compose는 별도 DB 볼륨과 `http://localhost:8080`을 사용한다. 팀원이 저장소를 받아도 원본은 자동 전송되지 않는다. 개발 화면을 `127.0.0.1:5173`으로 열고 Compose는 `localhost:8080`으로 열면 두 DB의 로그인 쿠키도 분리된다(쿠키는 포트별로 분리되지 않는다).
+
+필요 도구: Docker Engine + Compose v2 이상(BuildKit 지원), 설정 생성용 Python 3. 애플리케이션용 Node.js·Python·uv·PostgreSQL은 이미지에 포함된다. 빌드에는 이미지/패키지 레지스트리 접근이 필요하다. 저장소 **루트**에서:
+
+```sh
+python3 scripts/init_compose.py --parquet /absolute/path/to/ko_KR.parquet
+bash scripts/compose.sh local config --quiet
+bash scripts/compose.sh local up --build -d --wait
+```
+
+macOS에서 Docker Desktop 대신 Colima를 쓰는 경우의 예시다. Docker Desktop/Linux Engine 사용자는 이 설정이 필요 없다. Homebrew 플러그인 경로는 `brew --prefix`에 맞게 조정한다. 기존 Docker 설정을 바꾸지 않도록 프로젝트 안에 별도 CLI 설정을 둔다.
+
+```sh
+brew install colima docker docker-compose docker-buildx
+# 아래 dev 경로는 원본과 저장소가 있는 상위 폴더로 맞춘다. 기본은 읽기 전용 마운트다.
+colima start persona-lens --activate=false --ssh-config=false --cpu 4 --memory 8 --disk 30 --mount "$HOME/dev"
+mkdir -p .runtime/docker-client
+printf '%s\n' '{"cliPluginsExtraDirs":["/opt/homebrew/lib/docker/cli-plugins"]}' > .runtime/docker-client/config.json
+export DOCKER_CONFIG="$PWD/.runtime/docker-client"
+export DOCKER_HOST="unix://$HOME/.colima/persona-lens/docker.sock"
+# 위 환경 변수를 설정한 터미널에서 compose.sh를 실행한다.
+```
+
+생성기는 Git에서 제외된 `.env.compose`를 0600 권한으로 만든다. DB 관리자 비밀번호·앱 비밀번호·암호화 키는 각각 생성하고 출력하지 않는다. 재실행해도 기존 설정/키를 덮어쓰지 않는다. 원본은 경로만 기록하며 복사/수정하지 않는다. 포트 변경 시 HTTP 포트와 허용 Origin을 함께 변경한다.
+
+첫 접속에서 관리자 계정을 만든 뒤 모델 연결 화면에서 팀원을 등록한다. 프로젝트/결과는 계정별로 분리되며 공동 편집 권한은 아직 없다. 로컬 모의 연결:
+
+| 공급자 | 가짜 키 | DGX 기본 주소 |
+| --- | --- | --- |
+| OpenAI | `fake-openai-test` | 해당 없음 |
+| Anthropic | `fake-anthropic-test` | 해당 없음 |
+| DGX Spark | `fake-dgx-test` | `http://127.0.0.1:8001/dgx/v1` |
+
+8001은 **API 컨테이너가 바라보는 주소**다. 모의 서버는 API 네트워크 네임스페이스를 공유하고 외부 포트를 열지 않는다. 기본 `local` 모드는 별도 워커의 시연 생성기로 응답하며 외부 모델을 호출하지 않는다. `inference-test` 모드는 같은 모의 서버의 Responses API 형식으로 실제 전송·검증·저장 경로를 테스트한다.
+
+### 로컬 Docker에서 OpenAI 실제 응답
+
+공용 서버 배포 없이 사용할 수 있다. 먼저 위 절차로 `.env.compose`와 원본 경로를 준비한다. 동일한 DB 볼륨·계정·프로젝트·localhost 포트를 유지한 채 실행 모드만 바꾼다.
+
+```sh
+bash scripts/compose.sh openai config --quiet
+bash scripts/compose.sh openai up --build -d --wait --remove-orphans
+```
+
+Colima 사용자는 앞의 `DOCKER_CONFIG`, `DOCKER_HOST` 설정을 같은 터미널에 적용한다. `http://localhost:8080`을 새로고침하고:
+
+1. **모델 연결**에서 OpenAI **새 연결**에 실제 키를 입력·저장하고 모델 목록을 조회한다. 예전 가짜 키 연결은 자동으로 실제 연결로 전환되지 않는다.
+2. 프로젝트에서 설문을 작성하고 대상 집단을 **10명**으로 구성한다. **응답 모델**에서 새 OpenAI 연결과 모델을 선택하고 DB 저장 완료를 확인한다. Responses API와 구조화 출력을 지원하는 텍스트 모델이 필요하며 모델 목록 조회만으로 추론 지원이 보장되지는 않는다.
+3. **시뮬레이션** 확인 창에 `OpenAI 실제 응답`과 선택 모델이 표시되는지 확인하고 실행한다. 원본 파일 전체가 아니라 선택한 페르소나 속성(UUID 제외), 설문, 해당 페르소나의 이전 답변이 전송된다.
+4. **결과 → 실행 기록**에서 결과를 확인한다. 브라우저 재접속·새로고침 후 같은 실행 URL을 열어도 DB에서 복원된다. Docker와 워커가 켜져 있어야 처리한다.
+
+인원 상한은 실행당 10,000명이다. 기존 100개 응답 제한은 최대 인원×최대 1,000문항인 10,000,000개로 조정했다. 이는 입력 상한이며 해당 규모의 실제 API 실행 성능·비용을 검증했다는 뜻은 아니다. 계정당 실제 실행 1개, 워커 동시 처리 2명, 요청당 최대 출력 2,048토큰은 유지한다. 관리자가 `PERSONA_OPENAI_MAX_PEOPLE`, `PERSONA_OPENAI_MAX_RESPONSES`를 별도로 설정했다면 그 값이 우선한다. Responses API는 `store:false`, JSON Schema를 사용한다. 실행 확인은 인원×문항 수와 외부 호출을 안내한다. 모델 응답은 실제 여론으로 검증된 자료가 아니다.
+
+501명 이상인 집단·결과는 브라우저에 분석용 속성을 우선 제공한다. DB와 모델 입력에는 전체 원본 속성을 보존하며, 프로필 상세는 `/runs/{runId}/personas/{personaId}`에서 읽는다. 진행 조회는 전체 프로필을 읽지 않고 `runs.group_info`와 처리 카운터를 사용한다. 원본 집단 추출은 여전히 HTTP 요청으로 처리하며, 대규모 동시 사용을 위한 추출 작업 큐와 응답 페이지 API는 별도 확장 대상이다.
+
+### 후속 인터뷰
+
+실행 당시의 모델·페르소나·설문·저장된 답변을 사용한다. 설계 초안이나 현재 선택 모델을 바꿔도 과거 인터뷰의 모델과 맥락은 바뀌지 않는다. OpenAI 실행은 같은 연결의 현재 키를 사용하고, 시연 실행은 시연 인터뷰임을 표시한다. 비활성화·권한·연결 환경 변경은 오류로 처리하며 실제 호출 실패를 시연 답변으로 대체하지 않는다.
+
+| API | 동작 |
+| --- | --- |
+| GET `/api/v1/runs/{runId}/personas/{personaId}/interviews` | DB 대화와 처리 상태 조회 |
+| POST 위 경로 | `{requestId, questionId?, question}` → 202, 질문을 영속 큐에 접수 |
+| POST `/api/v1/interviews/{turnId}/retry` | 실패 답변 재시도, 누적 최대 3회 |
+| POST `/api/v1/interviews/{turnId}/cancel` | 답변 생성 취소, 이미 발행된 호출의 비용은 발생 가능 |
+
+`interview_turns`가 질문·답변·호출 수·토큰·오류·임대를 저장한다. 실행/페르소나별 한 질문씩 처리하며, 요청 ID 중복은 기존 질문을 반환한다. 브라우저를 닫아도 워커가 처리하고, 다른 세션에서도 복원된다. 최근 완료 대화 10회와 해당 페르소나의 전체 설문 응답을 프롬프트에 포함한다. 과거 전체 대화는 DB에 남는다. 워커 중단으로 완료 여부가 불명확한 호출은 자동 재전송하지 않는다. 이후 대화가 생긴 과거 실패 질문은 재시도하지 않고 새 질문으로 보낸다.
+
+새 설문은 `persona-survey-v2`를 사용한다. 객관식·척도형의 불필요한 텍스트와 기타 응답 필드를 제한하고, 이전 답변은 `2/5점 반대 (1점: 매우 반대, 5점: 매우 찬성)`처럼 의미를 함께 전달한다. 설명의 일관성을 지시하지만 의미적 모순을 완전히 차단하거나 여론의 정확성을 보증하는 검증기는 아니다. 기존 v1 실행 재시도는 해당 프롬프트 버전을 유지한다. 구조화 출력 규칙은 [OpenAI 공식 문서](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)를 따른다.
+
+시뮬레이션 화면은 저장 성공/실패·건너뜀/남은 응답 수로 약 2초마다 진행률 바를 갱신한다. 일부 실패의 처리율 100%는 성공 100%와 구분한다. 완료 시 같은 실행의 결과 바로가기를 표시하며, 취소·실패분 재시도도 이 화면에서 제공한다.
+
+모의 검증은 실제 키와 분리된 Compose 프로젝트·DB·포트에서 한다. `scripts/smoke_interviews.py`는 localhost:8082의 모의 모드를 확인한 뒤에만 가짜 키를 사용한다. 원본 30명×2문항, 취소·재시도, 인터뷰 중복 접수와 새 로그인 복원을 검증한다. `backend/tests/test_capacity.py`는 별도 테스트 Parquet의 10,000명 추출·저장·복원·작업 생성 경계값을 검사하며 대규모 외부 모델 호출은 하지 않는다.
+
+`inference_attempts`에 호출 시도를 먼저 저장하고 성공 응답과 토큰 사용량을 한 트랜잭션으로 기록한다. 문항별 누적 시도는 수동 재시도 포함 3회까지다. 429/서버 오류는 1회 자동 재시도하며, 네트워크 단절·시간 초과·프로세스 중단으로 완료 여부를 모르면 자동으로 같은 호출을 반복하지 않는다. 공급자 사용 내역 확인 후 명시적으로 재시도한다. 저장 중복은 방지하지만 외부 API 호출/과금의 exactly-once는 보장하지 않는다. 사용량은 공급자가 보고한 토큰 합계로, 확인 불가 호출과 실제 청구액은 공급자 대시보드에서 확인한다.
+
+긴 호출 중 워커가 작업 임대를 갱신한다. 취소 시 이후 답변 저장과 다음 호출을 막지만 이미 전송된 요청은 완료·과금될 수 있다. 연결 비활성/권한 변경은 매 호출 전에 재확인한다. 동일 연결의 키 교체 후 실패한 응답을 재시도할 수 있으며 모델·공급자 주소 변경에는 새 실행이 필요하다. 인증 오류·지원하지 않는 모델·출력 실패를 시연 응답으로 대체하지 않는다.
+
+가짜 키로 같은 경로를 검증하려면 `bash scripts/compose.sh inference-test up --build -d --wait --remove-orphans`를 사용한다. 화면/결과에는 `모의 OpenAI`로 표시한다. 기존 시연 모드 복귀는 `bash scripts/compose.sh local up -d --wait --remove-orphans`다. 모든 모드에서 `down -v` 없이 DB를 보존한다.
+
+기존 `smoke_compose.py`가 만든 로컬 관리자 상태가 있다면 `scripts/smoke_inference.py prepare`로 별도 원본 10명 프로젝트/실행을 만들고 `verify`로 20개 응답·사용량·재로그인 복원을 검사한다. 워커를 멈춘 채 prepare → `down`/`up` → verify 순서로 재시작 복원을 확인할 수 있다. `.runtime/inference-smoke.json`에 검증 상태만 보관하고 실제 API 모드에서는 스크립트 실행을 거부한다.
+
+API: 실행 POST의 `engine:"openai"`, `selection:{connectionId,modelId}`는 확인한 선택과 저장된 설계가 일치해야 한다. 기본값은 `demo`여서 기존 클라이언트는 과금 호출로 바뀌지 않는다. 결과 GET은 `usage`(시도 수/입출력 토큰/확인 불가 횟수)와 정제된 오류를 포함한다.
+
+참고: [OpenAI 구조화 출력](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
+
+### 서비스와 데이터
+
+| 서비스 | 역할 | 저장/접근 |
+| --- | --- | --- |
+| `web` | Caddy, React 빌드, `/api` 프록시, SPA 경로 복원 | 로컬 8080/8443 게시. 인증서와 설정은 별도 볼륨 |
+| `db` | PostgreSQL 18 | `postgres_data`를 `/var/lib/postgresql`에 연결. DB 포트 게시 없음 |
+| `migrate` | `alembic upgrade head` | DB 준비 후 실행. 성공해야 API/워커 시작 |
+| `api` | FastAPI·DuckDB | 원본을 `/data/ko_KR.parquet`에 **읽기 전용** 마운트. API 포트 게시 없음 |
+| `worker` | DB 작업 큐의 시연 실행 | 원본 마운트 없음. DB 실행 스냅샷 사용 |
+| `mock-provider` | 가짜 모델 목록 | `compose.local.yaml`에만 존재 |
+
+API/워커는 비특권 사용자와 읽기 전용 루트 파일시스템으로 실행한다. PostgreSQL 초기화 관리자와 앱 DB 소유자는 별도이며 앱은 클러스터 슈퍼유저가 아니다. DB 비밀번호는 URL에 사용되므로 생성한 16진수 형식을 유지한다. 기존 볼륨의 비밀번호는 환경 파일 수정만으로 바뀌지 않으며 DB 역할 비밀번호도 함께 변경해야 한다.
+
+`.dockerignore` 허용 목록은 `.env*`, 원본, 개발 DB, Git 이력, 호스트 가상환경을 빌드에서 제외한다. `src/data/personaSchema.json`은 API 이미지에 포함한다. 최초 원본 조회에서 버전 계산/검사를 수행한다. `/api/v1/health`는 API·DB만 확인하므로 원본/워커 검증을 대체하지 않는다.
+
+원본이 없으면 빈 폴더를 대신 만들지 않고 마운트를 실패시킨다. Linux에서는 UID 10001이 원본과 상위 경로를 읽을 수 있도록 권한을 준비한다. 파일은 웹 정적 경로에 배치하지 않는다. 원본 교체 시 새 버전을 배치하고 API 컨테이너를 재생성한다.
+
+### 시연·재시작 검증
+
+빈 로컬 DB에서 아래 명령을 실행한다. 기존 수동 관리자 계정이 있는 DB는 수동 UI 검증을 사용한다. 검증 스크립트는 샘플 계정·프로젝트·연결을 생성하고 기존 데이터를 지우지 않는다.
+
+```sh
+bash scripts/compose.sh local stop worker
+python3 scripts/smoke_compose.py prepare
+# 클라이언트 종료 뒤 queued 작업을 남긴 채 모든 컨테이너 재생성:
+bash scripts/compose.sh local down
+bash scripts/compose.sh local up -d --wait
+python3 scripts/smoke_compose.py verify
+```
+
+검증 범위는 세 공급자 가짜 키 등록/조회, 실제 조건별 인원과 10명 추출, 계정 간 프로젝트 접근 차단, DB 집단/모델 선택 복원, 암호화 키로 연결 재조회, 10명×2문항 시연과 중복 없는 20개 응답, 새 로그인 결과 복원이다. 임의 생성한 관리자 로그인 정보와 검증 상태는 `.runtime/compose-smoke.json`에 0600으로 보관하며 Git에서 제외한다. 스크립트는 loopback HTTP 주소만 허용한다.
+
+```sh
+bash scripts/compose.sh local ps
+bash scripts/compose.sh local logs --tail=100 api worker
+bash scripts/compose.sh local down
+```
+
+`down`은 볼륨을 보존한다. **`down -v`는 DB와 인증서를 삭제하므로 사용하지 않는다.** 재시작 정책은 `unless-stopped`이고 Docker 엔진이 켜져 있어야 한다. 수동 중지한 컨테이너는 `up`으로 다시 시작한다. 원본 추출은 아직 HTTP 요청 중 처리하며 API 프로세스당 동시 2개 제한이다. 부하가 몰리면 재시도가 필요할 수 있다. 실행 워커의 큐/체크포인트는 DB에 보존된다.
+
+### 연구실 서버용 설정
+
+`deploy/production.env.example`을 `.env.production`으로 복사하고 **별도로 생성한** DB 비밀번호, Fernet 키, 서버 원본 경로, 실제 도메인/Origin을 설정한다. 예시 도메인은 교체한다. 기본 Compose는 실제 추론을 꺼 둔다. OpenAI 응답은 `PERSONA_OPENAI_INFERENCE_ENABLED=true`로 명시적으로 켜며, 공개 서버 배포는 별도 검토가 필요하다.
+
+```sh
+# 설정 검토만 수행. 전체 config 출력에는 비밀 값이 포함될 수 있다.
+bash scripts/compose.sh production config --quiet
+```
+
+HTTPS에서는 `PERSONA_COOKIE_SECURE=true`를 유지한다. Caddy 공개 인증서 발급에는 해당 DNS와 인증 방식에 필요한 네트워크 접근이 필요하다. 내부 도메인은 학교 인증서 또는 신뢰할 내부 CA 설정을 별도로 준비한다. 학교 네트워크/방화벽은 자동 변경하지 않는다. 관리자 초기 등록은 접근을 제한한 상태에서 먼저 완료한다.
+
+API는 Compose 내부 Caddy의 전달 헤더를 신뢰한다. 이 전제를 유지하도록 API/DB 포트를 호스트에 게시하지 않는다. 웹 포트는 학교 방화벽에서 허용 범위를 제한한다. 로그는 컨테이너당 10MB×3개(모의 서버 5MB×2개)로 순환한다.
+
+DB 백업 예시(로컬 검증 DB, 저장소 루트):
+
+```sh
+mkdir -p .runtime/backups
+bash scripts/compose.sh local exec -T db pg_dump -U postgres -Fc persona_lens > .runtime/backups/persona_lens.dump
+```
+
+운영에서는 날짜별 백업을 서버 외부에 보관하고 별도 빈 DB에 `pg_restore`하여 복구를 확인한다. DB 덤프 외에 원본/해시, 환경 설정, `PERSONA_ENCRYPTION_KEY`도 안전하게 보관한다. 키가 없으면 저장된 모델 API 키를 복호화할 수 없다. 업데이트는 DB 백업 → 배포 커밋의 이미지 빌드 → 마이그레이션 → 컨테이너 재생성 → 검증 순서다. DB가 변경되었으면 이전 이미지로 되돌릴 때 스키마 호환성도 확인한다.
+
+참고: [Compose 운영 구성](https://docs.docker.com/compose/how-tos/production/), [PostgreSQL 공식 이미지와 18 데이터 경로](https://hub.docker.com/_/postgres), [Caddy HTTPS](https://caddyserver.com/docs/automatic-https), [uv Docker 사용](https://docs.astral.sh/uv/guides/integration/docker/).
 
 ## 검증
 

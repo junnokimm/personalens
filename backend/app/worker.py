@@ -1,4 +1,4 @@
-"""Durable demo worker. Run separately: python -m app.worker (no model/network calls)."""
+"""Durable demo/OpenAI worker. Run separately: python -m app.worker."""
 import argparse
 import copy
 import logging
@@ -8,11 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from uuid import uuid4
 
-from sqlalchemy import and_, exists, or_, select
+from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from .database import engine
-from .models import Response, Run, RunTask
+from .models import Response, Run, RunTask, InferenceAttempt
+from .errors import ApiError
+from .inference import credentials, generate, InferenceError
 from .runs import ACTIVE, now
 from .snapshots import digest
 
@@ -21,15 +23,19 @@ log = logging.getLogger("persona.worker")
 
 def recalculate(session, run):
     session.flush()
-    tasks = list(session.scalars(select(RunTask).where(RunTask.run_id == run.id)))
     n = len(run.survey["questions"])
-    run.succeeded = sum(t.next_question for t in tasks)
-    run.failed = sum(n - t.next_question for t in tasks if t.status == "failed")
+    succeeded, failed, active = session.execute(select(func.sum(RunTask.next_question),
+        func.sum(case((RunTask.status == "failed", n - RunTask.next_question), else_=0)),
+        func.count().filter(RunTask.status.in_(ACTIVE))).where(RunTask.run_id == run.id)).one()
+    run.succeeded, run.failed = succeeded or 0, failed or 0
     run.updated = now()
-    if not any(t.status in ACTIVE for t in tasks):
+    if not active:
         run.status = "completed" if not run.failed else "partial_failed" if run.succeeded else "failed"
         run.finished = now()
         run.fail_note = f"응답 {run.failed}개 생성 실패 · 성공 응답을 유지하고 실패한 작업만 재시도할 수 있습니다." if run.failed else ""
+        if run.failed:
+            errors = session.scalars(select(RunTask.error).where(RunTask.run_id == run.id, RunTask.status == "failed").limit(5))
+            run.fail_note += " " + " / ".join(dict.fromkeys(e for e in errors if e))[:600]
 
 
 def claim(db_engine, lease_seconds=30):
@@ -57,8 +63,8 @@ def claim(db_engine, lease_seconds=30):
             select(Response).where(Response.run_id == run.id, Response.persona_id == task.persona_id))}
         return dict(run_id=run.id, persona_id=task.persona_id, token=task.lease_token,
             index=task.next_question, fail_once=task.fail_once, prior=prior,
-            person=copy.deepcopy(run.group_snapshot["cohort"]["people"][task.person_index]),
-            survey=copy.deepcopy(run.survey), seed=run.engine["seed"])
+            person=session.scalar(select(Run.group_snapshot["cohort"]["people"][task.person_index]).where(Run.id == run.id)),
+            survey=copy.deepcopy(run.survey), seed=run.engine["seed"], engine=copy.deepcopy(run.engine), project_id=run.project_id)
 
 
 def locked_job(session, job):
@@ -80,7 +86,7 @@ def renew(db_engine, job, lease_seconds):
         return True
 
 
-def save_answer(db_engine, job, position, payload, lease_seconds=30):
+def save_answer(db_engine, job, position, payload, lease_seconds=30, attempt_id=None, usage=None):
     with Session(db_engine) as session, session.begin():
         run, task = locked_job(session, job)
         if task is None or task.next_question != position:
@@ -95,6 +101,10 @@ def save_answer(db_engine, job, position, payload, lease_seconds=30):
         elif type(payload.get("answer")) is not int or not 0 <= payload["answer"] < n:
             raise ValueError("Invalid zero-based answer")
         session.add(Response(run_id=run.id, persona_id=task.persona_id, question_id=question["id"], payload=payload))
+        if attempt_id:
+            attempt = session.get(InferenceAttempt, attempt_id)
+            attempt.status = "succeeded"
+            attempt.input_tokens, attempt.output_tokens = usage["input_tokens"], usage["output_tokens"]
         task.next_question += 1
         task.lease_until = now() + timedelta(seconds=lease_seconds)
         if task.next_question == len(run.survey["questions"]):
@@ -133,6 +143,8 @@ def demo_answer(job, question):
 
 def process(db_engine, job, *, delay=0.05, lease_seconds=30, stop=None):
     stop = stop or threading.Event()
+    if job.get("engine", {}).get("kind") == "openai":
+        return process_openai(db_engine, job, lease_seconds=lease_seconds, stop=stop)
     for position in range(job["index"], len(job["survey"]["questions"])):
         if stop.is_set() or not renew(db_engine, job, lease_seconds):
             return
@@ -148,9 +160,84 @@ def process(db_engine, job, *, delay=0.05, lease_seconds=30, stop=None):
         job["prior"][question["id"]] = answer
 
 
+def reserve_attempt(db_engine, job, question):
+    with Session(db_engine) as session, session.begin():
+        run, task = locked_job(session, job)
+        if task is None:
+            return None
+        attempts = list(session.scalars(select(InferenceAttempt).where(InferenceAttempt.run_id == run.id,
+            InferenceAttempt.persona_id == task.persona_id, InferenceAttempt.question_id == question["id"])))
+        if any(a.status == "started" for a in attempts):
+            raise InferenceError("INTERRUPTED_REQUEST", "이전 호출의 완료 여부를 알 수 없습니다. OpenAI 사용 내역 확인 후 재시도하세요.")
+        if len(attempts) >= run.engine["maxAttemptsPerAnswer"]:
+            raise InferenceError("ATTEMPT_LIMIT", "이 응답의 최대 호출 횟수에 도달했습니다. 설정을 확인한 뒤 새 실행을 시작하세요.")
+        attempt = InferenceAttempt(id=str(uuid4()), run_id=run.id, persona_id=task.persona_id,
+            question_id=question["id"], status="started", input_tokens=0, output_tokens=0, error_code="", created=now())
+        session.add(attempt)
+        return attempt.id
+
+
+def finish_attempt(db_engine, attempt_id, status, error_code="", usage=None):
+    with Session(db_engine) as session, session.begin():
+        attempt = session.get(InferenceAttempt, attempt_id)
+        if attempt and attempt.status == "started":
+            attempt.status, attempt.error_code = status, error_code
+            if usage:
+                attempt.input_tokens, attempt.output_tokens = usage["input_tokens"], usage["output_tokens"]
+
+
+def process_openai(db_engine, job, *, lease_seconds, stop):
+    finished, lost = threading.Event(), threading.Event()
+    def heartbeat():
+        while not finished.wait(min(5, lease_seconds / 3)):
+            try:
+                if not renew(db_engine, job, lease_seconds):
+                    lost.set(); return
+            except Exception:
+                lost.set(); return
+    if stop.is_set() or not renew(db_engine, job, lease_seconds):
+        return
+    keeper = threading.Thread(target=heartbeat, daemon=True)
+    keeper.start()
+    try:
+        for position in range(job["index"], len(job["survey"]["questions"])):
+            question = job["survey"]["questions"][position]
+            for retry_number in range(2):
+                if stop.is_set() or lost.is_set():
+                    return
+                base, key = credentials(db_engine, job)
+                attempt_id = reserve_attempt(db_engine, job, question)
+                if not attempt_id:
+                    return
+                try:
+                    answer, usage = generate(base, key, job, question)
+                except InferenceError as error:
+                    finish_attempt(db_engine, attempt_id, "failed", error.code, error.usage)
+                    if error.retryable and retry_number == 0:
+                        if stop.wait(2) or lost.is_set():
+                            return
+                        continue
+                    raise
+                if not save_answer(db_engine, job, position, answer, lease_seconds, attempt_id, usage):
+                    finish_attempt(db_engine, attempt_id, "discarded", usage=usage)
+                    return
+                job["prior"][question["id"]] = answer
+                break
+    except (InferenceError, ApiError) as error:
+        fail_job(db_engine, job, error.message)
+    finally:
+        finished.set()
+        keeper.join(timeout=6)
+
+
 def work(db_engine, stop, *, delay, lease_seconds):
+    from .interviews import claim_interview, process_interview
     while not stop.is_set():
         try:
+            interview = claim_interview(db_engine, lease_seconds)
+            if interview:
+                process_interview(db_engine, interview, lease_seconds=lease_seconds, stop=stop)
+                continue
             job = claim(db_engine, lease_seconds)
             if job is None:
                 stop.wait(0.25)
@@ -178,7 +265,7 @@ def main():
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
-    log.info("Demo worker started (%s threads); no model APIs are used", args.concurrency)
+    log.info("Survey/interview worker started (%s threads)", args.concurrency)
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         futures = [pool.submit(work, engine, stop, delay=args.demo_delay, lease_seconds=args.lease_seconds) for _ in range(args.concurrency)]
         for future in futures:

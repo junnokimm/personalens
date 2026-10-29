@@ -11,6 +11,7 @@ dependencies = [
   "pydantic==2.14.1",
   "pydantic-settings==2.16.1",
   "cryptography>=44,<48",
+  "duckdb>=1.4,<2",
 ]
 
 [dependency-groups]

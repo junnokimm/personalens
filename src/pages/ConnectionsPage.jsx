@@ -68,25 +68,26 @@ function AddMember() {
 }
 
 export default function ConnectionsPage() {
-  const { connections, mockMode, loading, error, load, check } = useConnectionStore()
+  const { connections, mockMode, openaiInferenceEnabled, loading, error, load, check } = useConnectionStore()
   const user = useSessionStore((s) => s.user)
   const [editing, setEditing] = useState(null), [busy, setBusy] = useState(''), [message, setMessage] = useState('')
   async function verify(id) {
     setBusy(id); setMessage('')
-    try { const row = await check(id); setMessage(row.status === 'ready' ? `${row.name}: ${row.models.length}개 모델 목록을 확인했습니다. 실제 응답 생성은 아직 연결하지 않았습니다.` : row.lastError) }
+    try { const row = await check(id); setMessage(row.status === 'ready' ? `${row.name}: ${row.models.length}개 모델 목록을 확인했습니다. ${row.inferenceReady ? '설계에서 모델을 선택한 뒤 소규모 실행으로 응답을 확인하세요.' : '이 연결은 현재 시연 실행용입니다.'}` : row.lastError) }
     catch (err) { setMessage(err.message) }
     finally { setBusy('') }
   }
   return <>
     <PageHead title="모델 연결" sub="개인 API 키 또는 연구실 모델 서버를 등록합니다. 프로젝트의 응답 모델 화면에서 연결과 모델을 선택하세요." />
     {mockMode && <p className="connection-notice" role="status">모의 서버 검증 모드 · OpenAI·Anthropic에는 fake-로 시작하는 가짜 키만 입력하세요.</p>}
+    {!mockMode && openaiInferenceEnabled && <p className="connection-notice" role="status">OpenAI 실제 실행 모드 · OpenAI 키를 등록하고 모델 목록을 조회한 뒤, 프로젝트의 응답 모델을 선택하세요. 시뮬레이션 실행 시 API 사용료가 발생합니다.</p>}
     <div className="connection-actions"><button className="primary" onClick={() => setEditing({})} disabled={!!editing}>+ 연결 등록</button><button onClick={load} disabled={loading || !!busy}>{loading ? '불러오는 중…' : '목록 새로고침'}</button></div>
     {error && <p role="alert" className="err-text">{error}</p>}{message && <p role="status" className="connection-notice">{message}</p>}
     {editing && <ConnectionForm key={editing.id || 'new'} original={editing.id ? editing : null} close={() => setEditing(null)} />}
     {!loading && !connections.length && <section className="card"><h2>등록된 연결이 없습니다</h2><p className="muted">OpenAI, Anthropic 또는 DGX Spark 연결을 추가하세요.</p></section>}
     {connections.map((c) => <section className="card connection-row" key={c.id}>
       <div><h2>{c.name} <span className="tag">{PROVIDER_NAMES[c.provider]}</span></h2><p className="muted small-text">{c.scope === 'shared' ? '연구실 공용' : '나만 사용'} · {c.enabled ? CONNECTION_STATUS[c.status] : '사용 중지'} · {c.hasKey ? '키 저장됨' : '키 없음'} · 모델 {c.models.length}개</p>
-        {c.provider === 'dgx' && <p className="small-text connection-url">{c.baseUrl}</p>}{c.lastError && <p className="err-text">{c.lastError}</p>}
+        {c.provider === 'dgx' && <p className="small-text connection-url">{c.baseUrl}</p>}{c.environmentMatches === false && <p className="muted small-text">이전 실행 환경의 연결 · 현재 환경에서는 새 연결을 등록하세요.</p>}{c.lastError && <p className="err-text">{c.lastError}</p>}
       </div>
       {c.canEdit ? <div className="connection-actions"><button disabled={!!busy || !c.enabled || !!editing} onClick={() => verify(c.id)}>{busy === c.id ? '확인 중…' : '연결 확인 · 모델 조회'}</button><button disabled={!!busy || !!editing} onClick={() => setEditing(c)}>수정</button></div> : <span className="muted small-text">관리자가 관리하는 연결</span>}
     </section>)}

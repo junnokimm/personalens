@@ -11,11 +11,15 @@ export function setSessionIdentity(id) { sessionIdentity = id }
 export function getSessionIdentity() { return sessionIdentity }
 
 export async function request(path, options = {}) {
+  const { timeout: timeoutMs = 15000, signal, ...fetchOptions } = options
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15000)
+  const abort = () => controller.abort()
+  if (signal?.aborted) abort()
+  signal?.addEventListener('abort', abort, { once: true })
+  const timeout = setTimeout(abort, timeoutMs)
   try {
     const response = await fetch(`/api/v1${path}`, {
-      ...options,
+      ...fetchOptions,
       signal: controller.signal,
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-Persona-Request': '1',
@@ -33,10 +37,12 @@ export async function request(path, options = {}) {
     throw new ApiError('서버에 연결하지 못했습니다. 연결을 확인한 뒤 다시 시도하세요.', 0, 'NETWORK_ERROR')
   } finally {
     clearTimeout(timeout)
+    signal?.removeEventListener('abort', abort)
   }
 }
 
 export const projectApi = {
+  getCohort: (projectId, id) => request('/projects/' + encodeURIComponent(projectId) + '/cohorts/' + encodeURIComponent(id)),
   list: () => request('/projects'),
   get: (id) => request(`/projects/${encodeURIComponent(id)}`),
   save: (operation) => request(operation.expectedRevision === 0 ? '/projects' : `/projects/${encodeURIComponent(operation.document.id)}`, {
@@ -50,7 +56,8 @@ export function projectDocument(project) {
   const { id, name, description, survey, groups, activeGroupId } = project
   const model = project.model?.connectionId ? { connectionId: project.model.connectionId, modelId: project.model.modelId }
     : project.model?.id ? { id: project.model.id } : null
-  return structuredClone({ id, name, description, survey: surveyContent(survey), groups, activeGroupId, model })
+  const drafts = groups.map((g) => ({ ...g, cohort: g.cohort?.id ? { id: g.cohort.id } : g.cohort }))
+  return structuredClone({ id, name, description, survey: surveyContent(survey), groups: drafts, activeGroupId, model })
 }
 
 export function surveyContent(survey) {

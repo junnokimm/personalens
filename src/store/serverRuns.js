@@ -12,7 +12,7 @@ const runApi = {
 export function mergeServerRun(previous, incoming, full = false) {
   if (previous?._server && new Date(previous.updated) > new Date(incoming.updated)) return previous
   const keepResult = previous?._loaded && previous.updated === incoming.updated
-  return { ...incoming, _server: true, _loaded: full || !!keepResult,
+  return { ...incoming, ...(keepResult ? { usage: previous.usage, errors: previous.errors, interviewCounts: previous.interviewCounts } : {}), _server: true, _loaded: full || !!keepResult,
     people: full ? incoming.people : keepResult ? previous.people : [],
     responses: full ? incoming.responses : keepResult ? previous.responses : [] }
 }
@@ -43,7 +43,21 @@ export function createServerRunActions(set, get, getSync) {
     })
   }
   return {
-    runsLoaded: false, runsError: '', resultErrors: {}, startingRuns: {},
+    runsLoaded: false, runsError: '', resultErrors: {}, startingRuns: {}, actingRuns: {}, personErrors: {},
+    async loadRunPerson(projectId, runId, personaId) {
+      const key = `person:${runId}:${personaId}`
+      if (loading.has(key)) return loading.get(key)
+      set((state) => { delete state.personErrors[key] })
+      const promise = request(`/runs/${encodeURIComponent(runId)}/personas/${encodeURIComponent(personaId)}`).then((person) => {
+        set((state) => {
+          const run = state.projects.find((p) => p.id === projectId)?.runs.find((r) => r.id === runId)
+          if (run) run.people = run.people.map((p) => p.id === personaId ? person : p)
+        })
+      }).catch((error) => set((state) => { state.personErrors[key] = error.message }))
+        .finally(() => loading.delete(key))
+      loading.set(key, promise)
+      return promise
+    },
     refreshRuns() {
       if (refreshing) return refreshing
       refreshing = (async () => {
@@ -87,7 +101,7 @@ export function createServerRunActions(set, get, getSync) {
       loading.set(runId, promise)
       return promise
     },
-    startServerRun(projectId, failNext = false) {
+    startServerRun(projectId, failNext = false, execution = { engine: 'demo' }) {
       restoreRequests()
       if (starting.has(projectId)) return starting.get(projectId)
       set((state) => { state.startingRuns[projectId] = true })
@@ -96,7 +110,11 @@ export function createServerRunActions(set, get, getSync) {
           if (!await getSync().flush(projectId)) throw Error('설계 저장을 완료한 뒤 실행하세요. 상단 저장 상태를 확인하세요.')
           const base = getSync().getBase(projectId)
           if (!base) throw Error('프로젝트를 먼저 저장하세요.')
-          requests[projectId] ||= { expectedRevision: base.revision, requestId: crypto.randomUUID(), groupId: base.activeGroupId, failNext }
+          const pending = requests[projectId]
+          if (pending && ((pending.engine || 'demo') !== execution.engine || stableJson(pending.selection || null) !== stableJson(execution.selection || null))) {
+            throw Error('접수 확인 중인 이전 실행이 있습니다. 기존 모델로 다시 확인한 뒤 새 실행을 시작하세요.')
+          }
+          requests[projectId] ||= { expectedRevision: base.revision, requestId: crypto.randomUUID(), groupId: base.activeGroupId, failNext, ...execution }
           remember()
           const run = await runApi.start(projectId, requests[projectId])
           delete requests[projectId]
@@ -118,10 +136,13 @@ export function createServerRunActions(set, get, getSync) {
       return promise
     },
     async serverRunAction(projectId, runId, action) {
+      if (get().actingRuns[runId]) return
+      set((state) => { state.actingRuns[runId] = true })
       try {
         upsert(projectId, await runApi.action(runId, action))
         await get().refreshRuns()
       } catch (error) { useUiStore.getState().showToast(error.message) }
+      finally { set((state) => { delete state.actingRuns[runId] }) }
     },
   }
 }

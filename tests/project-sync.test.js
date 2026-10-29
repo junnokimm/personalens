@@ -23,6 +23,19 @@ function setup(remote = [{ ...doc(), revision: 1 }], storage = new Map()) {
 afterEach(() => { instances.splice(0).forEach((sync) => sync.dispose()); vi.useRealTimers() })
 
 describe('server project persistence', () => {
+  it('hydrates a server cohort reference recovered from an unsaved outbox without copying profiles back into it', async () => {
+    const storage = new Map()
+    const draft = doc()
+    draft.groups[0].cohort = { id: 'cohort-new' }
+    storage.set(OUTBOX_KEY, JSON.stringify({ p1: { document: draft, revision: 1 } }))
+    const { sync, api, projects } = setup([{ ...doc(), revision: 1 }], storage)
+    api.getCohort = vi.fn(async () => ({ id: 'cohort-new', people: [{ id: 'P-001', attributes: { detailed_persona: '서버 원본' } }] }))
+    await sync.load()
+    expect(projects()[0].groups[0].cohort.people[0].attributes.detailed_persona).toBe('서버 원본')
+    expect(JSON.parse(storage.get(OUTBOX_KEY)).p1.document.groups[0].cohort).toEqual({ id: 'cohort-new' })
+    await sync.flush('p1')
+    expect(api.save.mock.calls[0][0].document.groups[0].cohort).toEqual({ id: 'cohort-new' })
+  })
   it('coalesces edits and preserves only the latest document', async () => {
     vi.useFakeTimers()
     const { sync, api, status } = setup()

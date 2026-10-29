@@ -1,0 +1,24 @@
+# Allowlist: secrets, local databases and the Parquet never enter the build context.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!index.html
+!vite.config.js
+!src/
+!src/**
+!backend/
+!backend/Dockerfile
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/alembic.ini
+!backend/app/
+!backend/app/**
+!backend/migrations/
+!backend/migrations/**
+!deploy/
+!deploy/Caddyfile
+**/__pycache__/
+**/*.pyc
+**/.env*
+**/*.parquet

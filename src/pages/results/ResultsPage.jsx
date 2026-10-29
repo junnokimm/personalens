@@ -13,6 +13,7 @@ import OverallView from './OverallView.jsx'
 import PersonasView from './PersonasView.jsx'
 import { ResultUrlProvider, useResultUrl } from './ResultUrlContext.jsx'
 import { RESULT_SECTIONS, resultSectionOf, resultSectionUrl } from './resultLinks.js'
+import { engineLabel } from '../../lib/execution.js'
 import SegmentView from './SegmentView.jsx'
 
 const SECTION_SUB = {
@@ -21,7 +22,7 @@ const SECTION_SUB = {
 }
 
 function CompletedResults({ project, run, done, onSelectRun }) {
-  const { view, drill, navigateResult } = useResultUrl()
+  const { view, drill, personaId, navigateResult } = useResultUrl()
   const section = resultSectionOf('results', view)
   const title = view === 'export' ? '내보내기' : RESULT_SECTIONS.find((s) => s.key === section)?.label || '결과'
 
@@ -48,9 +49,10 @@ function CompletedResults({ project, run, done, onSelectRun }) {
         <div><span>상태</span><b>합성 응답 · 미검증</b></div>
       </div>
       <div className={`banner ${run.status === 'completed' ? 'info' : 'warn'}`}>
-        <span>{run._server ? '서버 시연 응답 · 실제 모델 미연결 · 실행 시점의 설계 기준' : '이전 로컬 시연 응답 · 이 브라우저에만 저장됨'}
+        <span>{engineLabel(run)} · {run._server ? 'DB 저장 · 실행 시점의 설계 기준' : '이 브라우저에만 저장됨'}
           {run.status !== 'completed' ? ` · ${run.people.length * run.survey.questions.length}개 중 ${run.responses.length}개 응답만 표시합니다. 미응답을 해석에 유의하세요.` : ''}</span>
       </div>
+      {run.engine?.kind === 'openai' && run.usage && <p className="muted small-text">API 호출 {run.usage.attempts}회 · 보고된 입력 {run.usage.inputTokens.toLocaleString()} / 출력 {run.usage.outputTokens.toLocaleString()} 토큰{run.usage.unknownAttempts ? ` · 사용량 확인 불가 ${run.usage.unknownAttempts}회 (공급자 사용 내역 확인 필요)` : ''}</p>}
       {section === 'segment' ? (
         <div className="tabs" role="tablist" aria-label="집단별 분석 보기">
           {[['split', '집단 나누기'], ['people', '페르소나 목록']].map(([k, l]) => (
@@ -62,7 +64,7 @@ function CompletedResults({ project, run, done, onSelectRun }) {
         : view === 'personas' ? <PersonasView project={project} run={run} />
         : view === 'export' ? <ExportView project={project} run={run} />
         : view === 'detail' ? <DetailView project={project} run={run} />
-        : view === 'chat' ? <ChatView project={project} run={run} />
+        : view === 'chat' ? <ChatView key={`${run.id}:${personaId}`} project={project} run={run} />
         : <OverallView run={run} />}
     </>
   )

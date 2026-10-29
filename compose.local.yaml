@@ -1,0 +1,35 @@
+# Local, fake-key verification only. This sidecar shares the API's loopback
+# namespace, preserving the existing localhost-only mock-provider restriction.
+services:
+  api:
+    environment:
+      PERSONA_MOCK_PROVIDER_BASE_URL: http://127.0.0.1:8001
+      PERSONA_DGX_ALLOWED_BASE_URLS: '["http://127.0.0.1:8001/dgx/v1"]'
+
+  mock-provider:
+    image: persona-lens-api:${PERSONA_IMAGE_TAG:-local}
+    network_mode: service:api
+    command: [python, -m, app.mock_provider]
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/dgx/v1/models', timeout=4).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  web:
+    depends_on:
+      mock-provider:
+        condition: service_healthy

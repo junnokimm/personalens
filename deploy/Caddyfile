@@ -1,0 +1,27 @@
+{
+    admin off
+}
+
+{$PERSONA_SITE_ADDRESS} {
+    encode zstd gzip
+
+    @api path /api /api/*
+    handle @api {
+        reverse_proxy api:8000 {
+            transport http {
+                response_header_timeout 180s
+            }
+        }
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# Container liveness only; this port is never published to the host.
+http://:8081 {
+    respond /healthz "ok" 200
+}

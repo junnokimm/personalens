@@ -8,7 +8,7 @@ import { useUiStore } from '../../store/useUiStore.js'
 import { DesignStepNav, DesignStepper } from './designSteps.jsx'
 import { PROVIDER_NAMES, useConnectionStore } from '../../store/useConnectionStore.js'
 
-/* 설계 3단계 · 응답 모델 — 고른 값을 설계 상태에 저장만 한다(실제 호출은 아직 연결하지 않음) */
+/* 설계 3단계 · 응답 모델 — OpenAI 연결은 서버 실행에서 실제 응답에 사용한다. */
 export default function ModelPage() {
   const { projectId } = useParams()
   return SERVER_STORAGE ? <ConnectedModelPage key={projectId} /> : <LocalModelPage key={projectId} />
@@ -18,7 +18,7 @@ function ConnectedModelPage() {
   const { projectId } = useParams(), navigate = useNavigate()
   const project = useProject(projectId)
   const setModel = useProjectStore((s) => s.setConnectedModel)
-  const { connections, loading, error, load } = useConnectionStore()
+  const { connections, loading, error, load, openaiInferenceEnabled, mockMode, inferenceLimits } = useConnectionStore()
   const [browsing, setBrowsing] = useState(null)
   const connectionId = browsing ?? project.model?.connectionId ?? ''
   const connection = connections.find((c) => c.id === connectionId)
@@ -29,7 +29,10 @@ function ConnectedModelPage() {
     <PageHead title="응답 모델" sub="등록한 연결에서 사용할 모델을 고릅니다. 선택은 프로젝트에 저장되어 다음 방문에도 이어집니다." />
     <DesignStepper project={project} current="model" />
     <section className="card">
-      <h2>모델 선택</h2><p className="muted small-text">현재 시뮬레이션 응답은 시연 생성기가 만듭니다. 아래 모델로 실제 응답을 요청하는 기능은 다음 단계에서 연결합니다.</p>
+      <h2>모델 선택</h2><p className="muted small-text">{openaiInferenceEnabled
+        ? `OpenAI 선택 시 ${mockMode ? '모의 API로 응답 경로를 검증' : '선택한 모델로 실제 응답을 요청'}합니다. 최대 ${inferenceLimits.maxPeople}명·${inferenceLimits.maxResponses}개 응답. Anthropic·DGX는 아직 시연 응답입니다.`
+        : '현재 응답은 시연 생성기가 만듭니다. OpenAI 실제 실행 모드에서 API 응답을 사용할 수 있습니다.'}</p>
+      <button className="small" onClick={() => { setModel(projectId, null, null); setBrowsing('') }}>모델 선택 해제 · 시연 응답 사용</button>
       <div className="connection-picker"><div className="field"><label htmlFor="response-connection">사용할 연결</label><select id="response-connection" value={connectionId} onChange={(e) => setBrowsing(e.target.value)}>
         <option value="">연결을 선택하세요</option>
         {project.model?.connectionId && !connections.some((c) => c.id === project.model.connectionId) && <option value={project.model.connectionId}>저장된 연결 · 접근 불가</option>}
@@ -39,6 +42,7 @@ function ConnectedModelPage() {
       {project.model?.id && <p className="connection-notice">기존 시연 모델 선택이 남아 있습니다. 등록한 연결에서 모델을 다시 선택하세요.</p>}
       {project.model?.connectionId && !selectionExists && !loading && <p className="err-text">저장된 모델을 현재 사용할 수 없습니다. 연결 상태와 모델 목록을 확인하세요.</p>}
       {connection && !usable && <p className="connection-notice">연결 관리에서 사용 설정과 모델 목록을 확인하세요. {connection.lastError}</p>}
+      {connection?.environmentMatches === false && <p className="err-text">이 연결은 이전 실행 환경용입니다. 현재 환경에서 새 연결을 등록하세요.</p>}
       {connection?.status === 'manual' && <p className="connection-notice">직접 등록한 모델 ID입니다. 서버에서의 실행 가능 여부는 아직 확인하지 않았습니다.</p>}
       {usable && <div className="model-list" role="radiogroup" aria-label="응답 모델">{connection.models.map((m) => <label key={m.id} className={`model-opt ${selected === m.id ? 'on' : ''}`}>
         <input type="radio" name="connected-model" value={m.id} checked={selected === m.id} onChange={() => { setModel(projectId, connection.id, m.id); setBrowsing(null) }} />

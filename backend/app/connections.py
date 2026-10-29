@@ -56,17 +56,26 @@ def editable(row, user):
 
 
 def public_connection(row, user):
+    current_endpoint = False
+    try:
+        current_endpoint = row.base_url == endpoint(row.provider, row.base_url)
+    except ApiError:
+        pass
     return dict(id=row.id, name=row.name, provider=row.provider, scope=row.scope, baseUrl=row.base_url,
         hasKey=bool(row.encrypted_key), enabled=row.enabled, revision=row.revision, models=row.models,
         status=row.status, lastError=row.last_error, checkedAt=row.checked_at.isoformat() if row.checked_at else None,
-        canEdit=editable(row, user), updated=row.updated.isoformat())
+        canEdit=editable(row, user), updated=row.updated.isoformat(),
+        inferenceReady=settings.openai_inference_enabled and row.provider == "openai" and current_endpoint and row.enabled and row.status == "ready",
+        environmentMatches=current_endpoint)
 
 
 @router.get("")
 def listing(db: DB, user: CurrentUser):
     rows = db.scalars(select(ModelConnection).where(visible_clause(user)).order_by(ModelConnection.name))
     return {"connections": [public_connection(row, user) for row in rows],
-            "dgxAllowedBaseUrls": settings.dgx_allowed_base_urls, "mockMode": bool(settings.mock_provider_base_url)}
+            "dgxAllowedBaseUrls": settings.dgx_allowed_base_urls, "mockMode": bool(settings.mock_provider_base_url),
+            "openaiInferenceEnabled": settings.openai_inference_enabled,
+            "inferenceLimits": {"maxPeople": settings.openai_max_people, "maxResponses": settings.openai_max_responses}}
 
 
 @router.post("", status_code=201)
@@ -142,7 +151,7 @@ def check(connection_id: str, db: DB, user: CurrentUser):
 
 def validate_selection(db, user, selection):
     if selection is None or not hasattr(selection, "connectionId"):
-        return  # Legacy selections remain editable; all execution is still demo-only.
+        return  # Legacy selections remain editable for demo runs.
     row = connection(db, selection.connectionId, user)
     if not row.enabled or row.status not in ("ready", "manual"):
         raise ApiError(422, "CONNECTION_NOT_READY", "연결 상태를 확인한 뒤 모델을 선택하세요.")

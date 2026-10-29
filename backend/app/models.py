@@ -31,7 +31,7 @@ class Project(Base):
 
 class TargetGroup(Base):
     __tablename__ = "target_groups"
-    __table_args__ = (CheckConstraint("count IS NULL OR count BETWEEN 0 AND 9999"),)
+    __table_args__ = (CheckConstraint("count IS NULL OR count BETWEEN 0 AND 10000"),)
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
@@ -41,6 +41,26 @@ class TargetGroup(Base):
     filters: Mapped[dict[str, list[str]]] = mapped_column(JSONB)
     cohort: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     project: Mapped[Project] = relationship(back_populates="groups")
+
+
+class PersonaDataset(Base):
+    __tablename__ = "persona_datasets"
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    source_path: Mapped[str] = mapped_column(Text)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PersonaCohort(Base):
+    __tablename__ = "persona_cohorts"
+    __table_args__ = (UniqueConstraint("project_id", "request_id"),)
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("persona_datasets.id"))
+    request_id: Mapped[str] = mapped_column(String(100))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class SurveyVersion(Base):
@@ -68,7 +88,8 @@ class Run(Base):
     request_hash: Mapped[str] = mapped_column(String(64))
     survey_version_id: Mapped[str] = mapped_column(ForeignKey("survey_versions.id"))
     survey: Mapped[dict[str, Any]] = mapped_column(JSONB)
-    group_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    group_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, deferred=True)
+    group_info: Mapped[dict[str, Any]] = mapped_column(JSONB)
     engine: Mapped[dict[str, Any]] = mapped_column(JSONB)
     status: Mapped[str] = mapped_column(String(30))
     total: Mapped[int] = mapped_column(Integer)
@@ -117,11 +138,58 @@ class User(Base):
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class InferenceAttempt(Base):
+    __tablename__ = "inference_attempts"
+    __table_args__ = (ForeignKeyConstraint(["run_id", "persona_id"], ["run_tasks.run_id", "run_tasks.persona_id"]),)
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(100), index=True)
+    persona_id: Mapped[str] = mapped_column(String(100))
+    question_id: Mapped[str] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(String(30))
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    error_code: Mapped[str] = mapped_column(String(80), default="")
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     expires: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class InterviewTurn(Base):
+    __tablename__ = "interview_turns"
+    __table_args__ = (
+        ForeignKeyConstraint(["run_id", "persona_id"], ["run_tasks.run_id", "run_tasks.persona_id"]),
+        UniqueConstraint("run_id", "persona_id", "request_id"),
+        UniqueConstraint("run_id", "persona_id", "sequence"),
+        Index("uq_interview_active", "run_id", "persona_id", unique=True,
+              postgresql_where=text("status IN ('queued', 'running')")),
+        Index("ix_interview_queue", "status", "created"),
+        CheckConstraint("status IN ('queued','running','completed','failed','cancelled')"),
+    )
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(100))
+    persona_id: Mapped[str] = mapped_column(String(100))
+    request_id: Mapped[str] = mapped_column(String(100))
+    sequence: Mapped[int] = mapped_column(Integer)
+    question_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(30))
+    error: Mapped[str] = mapped_column(Text, default="")
+    error_code: Mapped[str] = mapped_column(String(80), default="")
+    prompt_version: Mapped[str] = mapped_column(String(80), default="persona-interview-v1")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    unknown_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    lease_token: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class ModelConnection(Base):

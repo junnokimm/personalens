@@ -1,0 +1,11 @@
+# Same localhost ports, database and read-only Parquet mount. Keys are entered in the app.
+services:
+  api:
+    environment:
+      PERSONA_MOCK_PROVIDER_BASE_URL: ""
+      PERSONA_OPENAI_INFERENCE_ENABLED: "true"
+  worker:
+    environment:
+      PERSONA_MOCK_PROVIDER_BASE_URL: ""
+      PERSONA_OPENAI_INFERENCE_ENABLED: "true"
+    command: [python, -m, app.worker, --concurrency, "2"]
