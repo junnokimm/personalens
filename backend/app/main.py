@@ -21,6 +21,7 @@ from .connections import router as connections_router, validate_selection
 from .config import settings
 from .cohorts import router as cohorts_router, resolve_cohort
 from .interviews import router as interviews_router
+from .trends import router as trends_router
 from .profiles import public_cohort
 
 app = FastAPI(title="PersonaLens persistence API", version="0.1.0")
@@ -29,6 +30,7 @@ app.include_router(auth_router)
 app.include_router(connections_router)
 app.include_router(cohorts_router)
 app.include_router(interviews_router)
+app.include_router(trends_router)
 DB = Annotated[Session, Depends(get_session)]
 
 

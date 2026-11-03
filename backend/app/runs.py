@@ -39,7 +39,7 @@ class StartRun(Contract):
 def summary(run):
     group = run.group_info
     return dict(id=run.id, projectId=run.project_id, number=run.number, created=run.created.isoformat(),
-        updated=run.updated.isoformat(), status=run.status,
+        updated=run.updated.isoformat(), finished=run.finished.isoformat() if run.finished else None, status=run.status,
         progress=int(100 * (run.succeeded + run.failed) / run.total),
         succeeded=run.succeeded, failed=run.failed, total=run.total, responseCount=run.succeeded,
         survey=run.survey, groupId=group["id"], groupName=group["name"],

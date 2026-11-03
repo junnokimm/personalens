@@ -192,6 +192,31 @@ class InterviewTurn(Base):
     updated: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class RunTrend(Base):
+    __tablename__ = "run_trends"
+    __table_args__ = (
+        CheckConstraint("status IN ('queued','running','completed','failed')"),
+        Index("ix_trend_queue", "status", "created"),
+    )
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), primary_key=True)
+    status: Mapped[str] = mapped_column(String(30))
+    prompt_version: Mapped[str] = mapped_column(String(80))
+    source: Mapped[dict | None] = mapped_column(JSONB, nullable=True, deferred=True)
+    source_hash: Mapped[str] = mapped_column(String(64), default="")
+    evidence: Mapped[dict] = mapped_column(JSONB, default=dict)
+    content: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error: Mapped[str] = mapped_column(Text, default="")
+    error_code: Mapped[str] = mapped_column(String(80), default="")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    unknown_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    lease_token: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ModelConnection(Base):
     __tablename__ = "model_connections"
     __table_args__ = (CheckConstraint("provider IN ('openai','anthropic','dgx')"), CheckConstraint("scope IN ('private','shared')"))

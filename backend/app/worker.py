@@ -232,6 +232,7 @@ def process_openai(db_engine, job, *, lease_seconds, stop):
 
 def work(db_engine, stop, *, delay, lease_seconds):
     from .interviews import claim_interview, process_interview
+    from .trends import claim_trend, process_trend
     while not stop.is_set():
         try:
             interview = claim_interview(db_engine, lease_seconds)
@@ -240,6 +241,10 @@ def work(db_engine, stop, *, delay, lease_seconds):
                 continue
             job = claim(db_engine, lease_seconds)
             if job is None:
+                trend = claim_trend(db_engine, lease_seconds)
+                if trend:
+                    process_trend(db_engine, trend, lease_seconds=lease_seconds, stop=stop)
+                    continue
                 stop.wait(0.25)
                 continue
             try:
@@ -265,7 +270,7 @@ def main():
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
-    log.info("Survey/interview worker started (%s threads)", args.concurrency)
+    log.info("Survey/interview/trend worker started (%s threads)", args.concurrency)
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         futures = [pool.submit(work, engine, stop, delay=args.demo_delay, lease_seconds=args.lease_seconds) for _ in range(args.concurrency)]
         for future in futures:
