@@ -24,6 +24,7 @@ import ConnectionsPage from './pages/ConnectionsPage.jsx'
 import { useConnectionStore } from './store/useConnectionStore.js'
 import { SERVER_STORAGE } from './store/useProjectStore.js'
 import { usePersonaData } from './store/usePersonaData.js'
+import ProjectTrend from './components/common/ProjectTrend.jsx'
 
 /* 원본 index.html의 바깥 틀(aside + main + overlay + toast) */
 function RootShell() {
@@ -57,7 +58,7 @@ function ProjectGate() {
   const { projectId } = useParams()
   const project = useProject(projectId)
   if (!project) return <Navigate to="/" replace />
-  return <Outlet />
+  return <><ProjectTrend key={project.id} project={project} /><Outlet /></>
 }
 
 /* 예전 주소(/runs)로 들어오면 결과 › 실행 기록으로 보낸다 */

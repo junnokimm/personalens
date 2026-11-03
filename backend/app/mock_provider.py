@@ -22,9 +22,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             request = json.loads(self.rfile.read(length))
             prompt = json.loads(request["input"][0]["content"])
-            question = prompt["currentQuestion"]
+            question = prompt.get("currentQuestion", {"type": "text"})
             time.sleep(min(2, max(0, float(os.environ.get("PERSONA_MOCK_DELAY", "0")))))
-            values = request["text"]["format"]["schema"]["properties"]["answer"].get("enum")
+            values = request["text"]["format"]["schema"]["properties"].get("answer", {}).get("enum")
             answer = values[len(values) // 2] if values else None
             result = {"answer": answer, "text": "[모의 OpenAI 응답] 지역의 접근성과 생활 여건을 고려했습니다." if values is None else "",
                 "otherText": "[모의 OpenAI 응답] 기타 의견" if question["type"] == "choice" and question["otherEnabled"] and answer == len(question["options"]) else ""}
@@ -32,6 +32,13 @@ class Handler(BaseHTTPRequestHandler):
                 prior = prompt["previousResponses"]
                 said = next((p["displayAnswer"] for p in prior if p["questionId"] == prompt["referenceQuestionId"]), prior[0]["displayAnswer"])
                 result["text"] = f'[모의 OpenAI 인터뷰] {prompt["persona"].get("age", "")}의 저장된 응답은 {said}입니다. 이전 대화 {len(prompt["interviewHistory"])}회를 참고했습니다.'
+            if prompt.get("kind") == "trend":
+                q = next((q for q in prompt["questions"] if q["distribution"]), prompt["questions"][0])
+                top = sorted(q["distribution"], key=lambda x: x["count"], reverse=True)
+                opinion = f'「{top[0]["label"]}」 응답이 가장 많습니다.' if top and (len(top) == 1 or top[0]['count'] > top[1]['count']) else '의견이 나뉘거나 서술형 해석이 필요합니다.'
+                result = dict(headline=f'[모의 요약] {prompt["topic"]}',
+                    overview=f'합성 페르소나의 문항 {q["number"]}에서는 {opinion}',
+                    keyPoints=[dict(text='선택한 실행의 저장된 응답 분포를 기준으로 정리했습니다.', questionIds=[q['id']])])
             body = {"status": "completed", "model": request["model"], "output": [{"type": "message", "content": [
                 {"type": "output_text", "text": json.dumps(result, ensure_ascii=False)}]}],
                 "usage": {"input_tokens": 100, "output_tokens": 25}}
